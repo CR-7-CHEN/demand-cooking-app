@@ -93,7 +93,7 @@
 
 <style lang="scss" scoped>
   page {
-    background-color: #ffffff;
+    background-color: #fff7f0;
   }
 
   .example {

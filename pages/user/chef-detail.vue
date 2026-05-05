@@ -21,12 +21,24 @@
     </view>
 
     <view class="card">
+      <view class="card-title">预约参考</view>
+      <view class="info-row">
+        <text class="info-label">可预约时间</text>
+        <text class="info-value">{{ chef.availableTimeText }}</text>
+      </view>
+      <view class="info-row">
+        <text class="info-label">价格预估</text>
+        <text class="info-value">{{ chef.priceEstimateText }}</text>
+      </view>
+    </view>
+
+    <view class="card">
       <view class="card-head">
         <view class="card-title">预约信息</view>
         <button class="text-btn" @click="goAddress">管理地址</button>
       </view>
 
-      <picker :range="addressOptions" @change="selectAddress">
+      <picker v-if="addresses.length" :range="addressOptions" @change="selectAddress">
         <view class="select-box">
           <view v-if="selectedAddress">
             <view class="select-title">{{ selectedAddress.contactName }} {{ selectedAddress.phone }}</view>
@@ -36,6 +48,13 @@
           <uni-icons type="right" size="16" color="#9aa19c"></uni-icons>
         </view>
       </picker>
+      <view v-else class="select-box address-empty" @click="goAddress">
+        <view>
+          <view class="select-title">暂无上门地址</view>
+          <view class="select-sub">请先新增地址后再提交预约</view>
+        </view>
+        <uni-icons type="right" size="16" color="#9aa19c"></uni-icons>
+      </view>
 
       <view class="form-row">
         <view class="label">上门日期</view>
@@ -73,7 +92,9 @@
     </view>
 
     <view class="bottom-bar">
-      <button class="submit-btn" :disabled="submitting" @click="submit">提交预约</button>
+      <button class="submit-btn" :class="{ 'is-disabled': submitting }" :loading="submitting" :disabled="submitting" @click="submit">
+        {{ submitting ? '提交中...' : '提交预约' }}
+      </button>
     </view>
   </view>
 </template>
@@ -93,7 +114,9 @@
           avatar: defaultAvatar,
           name: '做饭人员',
           cuisines: [],
-          serviceAreaText: ''
+          serviceAreaText: '',
+          availableTimeText: '可预约时间待确认',
+          priceEstimateText: '价格待报价，以报价为准'
         },
         addresses: [],
         selectedAddressIndex: -1,
@@ -116,7 +139,6 @@
         return this.selectedAddressIndex >= 0 ? this.addresses[this.selectedAddressIndex] : null
       },
       addressOptions() {
-        if (!this.addresses.length) return ['暂无地址，请先新增']
         return this.addresses.map(item => item.fullAddress)
       }
     },
@@ -179,8 +201,73 @@
           cuisines,
           serviceAreaText: areas.length ? areas.join('、') : '服务区域待完善',
           recommended: item.recommended || item.recommendFlag || item.isRecommended,
-          description: item.description || item.introduction || item.profile || item.remark || ''
+          description: item.description || item.introduction || item.profile || item.remark || '',
+          availableTimeText: this.formatAvailableTime(item),
+          priceEstimateText: this.formatPriceEstimate(item)
         }
+      },
+      formatAvailableTime(item) {
+        const directText = this.firstValue(item, [
+          'availableTimeText',
+          'serviceTimeText',
+          'scheduleText',
+          'availableTime',
+          'availableTimes',
+          'serviceTime',
+          'serviceTimes',
+          'workTime',
+          'workingTime',
+          'businessHours',
+          'openingHours'
+        ])
+        if (directText) return this.textValue(directText)
+
+        const start = this.firstValue(item, ['serviceStartTime', 'workStartTime', 'availableStartTime', 'startTime'])
+        const end = this.firstValue(item, ['serviceEndTime', 'workEndTime', 'availableEndTime', 'endTime'])
+        if (start && end) return `${start}-${end}`
+        return '可预约时间待确认'
+      },
+      formatPriceEstimate(item) {
+        const directText = this.firstValue(item, ['priceText', 'priceEstimate', 'priceDescription', 'feeDescription'])
+        if (directText) return this.textValue(directText)
+
+        const priceItems = [
+          { label: '起步价', value: this.firstValue(item, ['startPrice', 'startingPrice', 'basePrice', 'minimumPrice']) },
+          { label: '服务价', value: this.firstValue(item, ['servicePrice', 'serviceFee', 'price']) },
+          { label: '小时价', value: this.firstValue(item, ['hourlyPrice', 'hourPrice', 'pricePerHour']) }
+        ].filter(item => item.value !== undefined && item.value !== null && item.value !== '')
+
+        const seen = []
+        const texts = priceItems.map(item => {
+          const money = this.moneyText(item.value)
+          if (!money || seen.indexOf(`${item.label}:${money}`) !== -1) return ''
+          seen.push(`${item.label}:${money}`)
+          return `${item.label}${money}${item.label === '小时价' ? '/小时' : ''}`
+        }).filter(Boolean)
+
+        return texts.length ? texts.join('，') : '价格待报价，以报价为准'
+      },
+      firstValue(item, keys) {
+        for (let i = 0; i < keys.length; i += 1) {
+          const value = item[keys[i]]
+          if (value !== undefined && value !== null && value !== '') return value
+        }
+        return ''
+      },
+      textValue(value) {
+        if (Array.isArray(value)) {
+          return value.map(this.textValue).filter(Boolean).join('、')
+        }
+        if (typeof value === 'object') {
+          return Object.values(value).map(this.textValue).filter(Boolean).join('、')
+        }
+        return String(value).trim()
+      },
+      moneyText(value) {
+        if (typeof value === 'number') return `￥${value}`
+        const text = String(value).trim()
+        if (!text) return ''
+        return /[￥元]/.test(text) ? text : `￥${text}`
       },
       normalizeAddress(item) {
         const region = item.region || item.area || item.district || ''
@@ -194,8 +281,11 @@
           detailAddress: detail,
           houseNumber: house,
           fullAddress: [region, detail, house].filter(Boolean).join(' '),
-          isDefault: item.isDefault || item.defaultFlag
+          isDefault: this.normalizeDefault(item.isDefault, item.defaultFlag)
         }
+      },
+      normalizeDefault(...values) {
+        return values.some(value => value === true || value === 1 || value === '1' || value === 'true' || value === 'Y')
       },
       normalizeDish(item) {
         return {
@@ -250,13 +340,15 @@
         return true
       },
       submit() {
+        if (this.submitting) return
         if (!getToken()) {
           this.$modal.msg('提交预约前请先登录')
           this.$tab.navigateTo('/pages/login')
           return
         }
         if (!this.selectedAddress) {
-          this.$modal.msg('请选择上门地址')
+          this.$modal.msg('请先新增上门地址')
+          this.goAddress()
           return
         }
         const startTime = this.buildStartTime()
@@ -312,7 +404,7 @@
   page,
   .page {
     min-height: 100vh;
-    background: #f7f8f5;
+    background: #fff7f0;
   }
 
   .page {
@@ -417,6 +509,30 @@
     font-weight: 700;
   }
 
+  .info-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 24rpx;
+    padding-top: 20rpx;
+  }
+
+  .info-label {
+    flex-shrink: 0;
+    color: #4e5a55;
+    font-size: 26rpx;
+  }
+
+  .info-value {
+    min-width: 0;
+    flex: 1;
+    color: #26322d;
+    font-size: 26rpx;
+    line-height: 1.5;
+    text-align: right;
+    word-break: break-all;
+  }
+
   .text-btn {
     width: 132rpx;
     height: 52rpx;
@@ -435,6 +551,10 @@
     border: 1rpx solid #edf0ec;
     border-radius: 8rpx;
     background: #fbfcfa;
+  }
+
+  .address-empty {
+    background: #fffaf6;
   }
 
   .select-title,
@@ -510,5 +630,9 @@
     background: #f06a3a;
     font-size: 30rpx;
     font-weight: 700;
+  }
+
+  .submit-btn.is-disabled {
+    background: #f4a484;
   }
 </style>

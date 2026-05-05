@@ -306,7 +306,7 @@
 
 <style lang="scss" scoped>
   page {
-    background: #f5f7f5;
+    background: #fff7f0;
   }
 
   .chef-work-page {
@@ -319,7 +319,7 @@
   .top-card {
     padding: 32rpx;
     border-radius: 16rpx;
-    background: #17211b;
+    background: #6a3a2b;
     color: #fff;
   }
 

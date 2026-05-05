@@ -20,34 +20,37 @@
     data() {
       return {
         list: [{
-            icon: 'iconfont icon-github',
-            title: '若依问题',
+            icon: 'iconfont icon-help',
+            title: '预约服务',
             childList: [{
-              title: '若依开源吗？',
-              content: '开源'
+              title: '如何预约上门做饭？',
+              content: '进入首页选择服务类型、用餐时间、用餐人数和地址，提交订单后等待做饭人员接单。'
             }, {
-              title: '若依可以商用吗？',
-              content: '可以'
+              title: '可以提前多久预约？',
+              content: '建议至少提前1天预约，节假日或多人聚餐建议更早提交，方便平台匹配合适人员。'
             }, {
-              title: '若依官网地址多少？',
-              content: 'http://ruoyi.vip'
+              title: '食材由谁准备？',
+              content: '下单时可选择用户自备食材，或按页面支持的服务说明由做饭人员协助采购。具体以订单确认信息为准。'
             }, {
-              title: '若依文档地址多少？',
-              content: 'http://doc.ruoyi.vip'
+              title: '可以备注口味和忌口吗？',
+              content: '可以。提交订单时填写口味偏好、忌口、过敏源、厨房条件等信息，做饭人员会按备注准备服务。'
             }]
           },
           {
             icon: 'iconfont icon-help',
-            title: '其他问题',
+            title: '订单与售后',
             childList: [{
-              title: '如何退出登录？',
-              content: '请点击[我的] - [应用设置] - [退出登录]即可退出登录',
+              title: '如何查看订单状态？',
+              content: '进入我的订单，可查看待接单、待服务、服务中、已完成等状态，以及做饭人员信息和预约时间。'
             }, {
-              title: '如何修改用户头像？',
-              content: '请点击[我的] - [选择头像] - [点击提交]即可更换用户头像',
+              title: '服务完成后如何评价？',
+              content: '订单完成后可在订单详情中提交评分和评价，评价会用于后续服务人员匹配和服务质量改进。'
             }, {
-              title: '如何修改登录密码？',
-              content: '请点击[我的] - [应用设置] - [修改密码]即可修改登录密码',
+              title: '订单取消、退款或投诉怎么处理？',
+              content: '请在订单详情发起取消、退款或投诉申请，平台会根据服务进度、取消原因和规则进行处理。'
+            }, {
+              title: '如何成为做饭人员？',
+              content: '进入入驻申请页面，按要求填写身份、服务区域、擅长菜系和资质信息，审核通过后即可接收平台订单。'
             }]
           }
         ]
@@ -63,7 +66,7 @@
 
 <style lang="scss" scoped>
   page {
-    background-color: #f8f8f8;
+    background-color: #fff7f0;
   }
 
   .help-container {

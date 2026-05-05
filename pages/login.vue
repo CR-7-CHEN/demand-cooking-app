@@ -1,9 +1,7 @@
 <template>
   <view class="normal-login-container">
     <view class="logo-content align-center justify-center flex">
-      <image style="width: 100rpx;height: 100rpx;" :src="globalConfig.appInfo.logo" mode="widthFix">
-      </image>
-      <text class="title">若依移动端登录</text>
+      <text class="title">上门做饭管理系统</text>
     </view>
     <view class="login-form-content">
       <view class="input-item flex align-center">
@@ -14,15 +12,11 @@
         <view class="iconfont icon-password icon"></view>
         <input v-model="loginForm.password" type="password" class="input" placeholder="请输入密码" maxlength="20" />
       </view>
-      <view class="input-item flex align-center" style="width: 60%;margin: 0px;" v-if="captchaEnabled">
-        <view class="iconfont icon-code icon"></view>
-        <input v-model="loginForm.code" type="number" class="input" placeholder="请输入验证码" maxlength="4" />
-        <view class="login-code"> 
-          <image :src="codeUrl" @click="getCode" class="login-code-img"></image>
-        </view>
-      </view>
       <view class="action-btn">
-        <button @click="handleLogin" class="login-btn cu-btn block bg-blue lg round">登录</button>
+        <button @click="handleLogin" class="login-btn cu-btn block lg round" hover-class="login-btn-hover">登录</button>
+      </view>
+      <view class="action-btn wechat-action-btn">
+        <button @click="handleWxLogin" class="wechat-login-btn cu-btn block lg round" hover-class="wechat-login-btn-hover">微信快捷登录</button>
       </view>
       <view class="reg text-center" v-if="register">
         <text class="text-grey1">没有账号？</text>
@@ -39,27 +33,19 @@
 </template>
 
 <script>
-  import { getCodeImg } from '@/api/login'
   import { getToken } from '@/utils/auth'
 
   export default {
     data() {
       return {
-        codeUrl: "",
-        captchaEnabled: true,
         // 用户注册开关
-        register: false,
+        register: true,
         globalConfig: getApp().globalData.config,
         loginForm: {
-          username: "admin",
-          password: "admin123",
-          code: "",
-          uuid: ""
+          username: "",
+          password: ""
         }
       }
-    },
-    created() {
-      this.getCode()
     },
     onLoad() {
       //#ifdef H5
@@ -83,24 +69,12 @@
         let site = this.globalConfig.appInfo.agreements[1]
         this.$tab.navigateTo(`/pages/common/webview/index?title=${site.title}&url=${site.url}`)
       },
-      // 获取图形验证码
-      getCode() {
-        getCodeImg().then(res => {
-          this.captchaEnabled = res.captchaEnabled === undefined ? true : res.captchaEnabled
-          if (this.captchaEnabled) {
-            this.codeUrl = 'data:image/gif;base64,' + res.img
-            this.loginForm.uuid = res.uuid
-          }
-        })
-      },
       // 登录方法
       async handleLogin() {
         if (this.loginForm.username === "") {
           this.$modal.msgError("请输入账号")
         } else if (this.loginForm.password === "") {
           this.$modal.msgError("请输入密码")
-        } else if (this.loginForm.code === "" && this.captchaEnabled) {
-          this.$modal.msgError("请输入验证码")
         } else {
           this.$modal.loading("登录中，请耐心等待...")
           this.pwdLogin()
@@ -108,16 +82,89 @@
       },
       // 密码登录
       async pwdLogin() {
-        this.$store.dispatch('Login', this.loginForm).then(() => {
+        let loginInfo = {}
+        try {
+          loginInfo = await this.getPasswordLoginInfo()
+        } catch (error) {
+          this.$modal.closeLoading()
+          this.$modal.msgError(error.message || '微信登录凭证获取失败，请重试')
+          return
+        }
+        this.$store.dispatch('Login', {
+          ...this.loginForm,
+          ...loginInfo
+        }).then(() => {
           this.$modal.closeLoading()
           this.loginSuccess()
         }).catch(() => {
-          if (this.captchaEnabled) {
-            this.getCode()
-          }
+          this.$modal.closeLoading()
+        })
+      },
+      getPasswordLoginInfo() {
+        return new Promise((resolve, reject) => {
+          // #ifdef MP-WEIXIN
+          uni.login({
+            success: ({ code }) => {
+              if (!code) {
+                reject(new Error('未获取到微信登录凭证，请重试'))
+                return
+              }
+              resolve({
+                xcxCode: code,
+                appid: this.getMiniProgramAppId()
+              })
+            },
+            fail: () => {
+              reject(new Error('微信登录凭证获取失败，请重试'))
+            }
+          })
+          // #endif
+          // #ifndef MP-WEIXIN
+          resolve({})
+          // #endif
         })
       },
       // 登录成功后，处理函数
+      handleWxLogin() {
+        // #ifndef MP-WEIXIN
+        this.$modal.msgError('请在微信小程序环境中使用微信快捷登录')
+        return
+        // #endif
+        // #ifdef MP-WEIXIN
+        this.$modal.loading('微信登录中，请稍候...')
+        uni.login({
+          success: ({ code }) => {
+            if (!code) {
+              this.$modal.closeLoading()
+              this.$modal.msgError('未获取到微信登录凭证，请重试')
+              return
+            }
+            this.$store.dispatch('WxLogin', {
+              xcxCode: code,
+              appid: this.getMiniProgramAppId()
+            }).then(() => {
+              this.$modal.closeLoading()
+              this.loginSuccess()
+            }).catch(() => {
+              this.$modal.closeLoading()
+            })
+          },
+          fail: () => {
+            this.$modal.closeLoading()
+            this.$modal.msgError('微信登录失败，请重试')
+          }
+        })
+        // #endif
+      },
+      getMiniProgramAppId() {
+        // #ifdef MP-WEIXIN
+        const accountInfo = uni.getAccountInfoSync ? uni.getAccountInfoSync() : null
+        return accountInfo && accountInfo.miniProgram ? accountInfo.miniProgram.appId : ''
+        // #endif
+        // #ifndef MP-WEIXIN
+        return ''
+        // #endif
+      },
       loginSuccess(result) {
         // 设置用户信息
         this.$store.dispatch('GetInfo').then(res => {
@@ -130,7 +177,7 @@
 
 <style lang="scss" scoped>
   page {
-    background-color: #ffffff;
+    background-color: #fff7f0;
   }
 
   .normal-login-container {
@@ -142,12 +189,10 @@
       text-align: center;
       padding-top: 15%;
 
-      image {
-        border-radius: 4px;
-      }
-
       .title {
-        margin-left: 10px;
+        margin-left: 0;
+        font-weight: bold;
+        color: #333;
       }
     }
 
@@ -159,7 +204,7 @@
 
       .input-item {
         margin: 20px auto;
-        background-color: #f5f6f7;
+        background-color: #fff1e8;
         height: 45px;
         border-radius: 20px;
 
@@ -182,6 +227,35 @@
       .login-btn {
         margin-top: 40px;
         height: 45px;
+        background-color: #f06a3a;
+        color: #ffffff;
+        border: 1px solid #f06a3a;
+        box-sizing: border-box;
+      }
+
+      .login-btn-hover {
+        background-color: #e45f30;
+        border-color: #e45f30;
+        opacity: 0.9;
+        transform: scale(0.98);
+      }
+
+      .wechat-action-btn {
+        margin-top: 14px;
+      }
+
+      .wechat-login-btn {
+        height: 45px;
+        background-color: #fff1e8;
+        color: #e86f1a;
+        border: 1px solid #f4b28c;
+        box-sizing: border-box;
+      }
+
+      .wechat-login-btn-hover {
+        background-color: #ffe8d9;
+        opacity: 0.86;
+        transform: scale(0.98);
       }
       
       .reg {
@@ -193,17 +267,6 @@
         margin-top: 20px;
       }
       
-      .login-code {
-        height: 38px;
-        float: right;
-      
-        .login-code-img {
-          height: 38px;
-          position: absolute;
-          margin-left: 10px;
-          width: 200rpx;
-        }
-      }
     }
   }
 

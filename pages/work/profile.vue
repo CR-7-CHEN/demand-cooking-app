@@ -23,12 +23,31 @@
         <input class="input" v-model.trim="form.phone" type="number" maxlength="11" placeholder="请输入 11 位手机号" />
       </view>
       <view class="field">
-        <text class="label">头像 URL</text>
-        <input class="input" v-model.trim="form.avatarUrl" placeholder="填写头像图片地址" />
+        <text class="label">头像</text>
+        <view class="upload-row">
+          <view class="avatar-uploader" @click="chooseAvatar">
+            <image v-if="form.avatarUrl" class="avatar-preview" :src="form.avatarUrl" mode="aspectFill"></image>
+            <view v-if="form.avatarUrl" class="image-remove" @click.stop="removeAvatar">×</view>
+            <view v-else class="upload-placeholder">
+              <text class="upload-plus">+</text>
+              <text>上传头像</text>
+            </view>
+          </view>
+          <text class="upload-tip">建议使用清晰正方形图片</text>
+        </view>
       </view>
       <view class="field">
-        <text class="label">作品图 URL 文本</text>
-        <textarea class="textarea" v-model.trim="form.workImageUrls" placeholder="多张图片可用逗号或换行分隔" />
+        <text class="label">作品图</text>
+        <view class="image-grid">
+          <view v-for="(item, index) in workImageList" :key="item + index" class="work-image">
+            <image :src="item" mode="aspectFill"></image>
+            <view class="image-remove" @click.stop="removeWorkImage(index)">×</view>
+          </view>
+          <view v-if="canAddWorkImage" class="image-add" @click="chooseWorkImages">
+            <text class="upload-plus">+</text>
+            <text>上传作品</text>
+          </view>
+        </view>
       </view>
       <view class="field">
         <text class="label">擅长菜系</text>
@@ -36,7 +55,15 @@
       </view>
       <view class="field">
         <text class="label">服务区域</text>
-        <input class="input" v-model.trim="form.serviceArea" placeholder="如 西湖区、滨江区" />
+        <picker mode="region" :value="regionValue" @change="onRegionChange">
+          <view class="input picker add-region">{{ serviceAreaList.length ? '继续添加服务区域' : '请选择省 / 市 / 区' }}</view>
+        </picker>
+        <view v-if="serviceAreaList.length" class="area-list">
+          <view v-for="(item, index) in serviceAreaList" :key="item + index" class="area-tag">
+            <text>{{ item }}</text>
+            <text class="area-remove" @click.stop="removeServiceArea(index)">×</text>
+          </view>
+        </view>
       </view>
       <view class="field">
         <text class="label">健康证有效期</text>
@@ -45,8 +72,21 @@
         </picker>
       </view>
       <view class="field">
+        <text class="label">健康证图片</text>
+        <view class="image-grid">
+          <view v-if="form.healthCertificateImageUrl" class="work-image">
+            <image :src="form.healthCertificateImageUrl" mode="aspectFill" @click="previewImage(form.healthCertificateImageUrl)"></image>
+            <view class="image-remove" @click.stop="removeHealthCertificateImage">×</view>
+          </view>
+          <view v-else class="image-add" @click="chooseHealthCertificateImage">
+            <text class="upload-plus">+</text>
+            <text>上传健康证</text>
+          </view>
+        </view>
+      </view>
+      <view class="field">
         <text class="label">个人简介</text>
-        <textarea class="textarea intro" v-model.trim="form.introduction" placeholder="介绍服务经验、拿手菜和服务风格" />
+        <textarea class="textarea intro" v-model.trim="form.introduction" placeholder="介绍服务经验、拿手菜和服务风格"></textarea>
       </view>
     </view>
 
@@ -55,7 +95,7 @@
 </template>
 
 <script>
-  import { getChefMy, applyChef, updateChefMy } from '@/api/cooking/chef'
+  import { getChefMy, applyChef, updateChefMy, uploadChefImage } from '@/api/cooking/chef'
 
   const ACTIVE = ['APPROVED', 'AUDIT_PASS', 'PASSED', 'NORMAL', 'ENABLED']
   const PENDING = ['PENDING', 'WAIT_AUDIT', 'AUDITING', 'APPLYING']
@@ -67,6 +107,13 @@
       return {
         chef: {},
         submitting: false,
+        uploadingAvatar: false,
+        uploadingWorks: false,
+        uploadingHealthCertificate: false,
+        maxWorkImages: 5,
+        workImageList: [],
+        serviceAreaList: [],
+        regionValue: [],
         form: {
           realName: '',
           phone: '',
@@ -74,6 +121,7 @@
           workImageUrls: '',
           cuisineTags: '',
           serviceArea: '',
+          healthCertificateImageUrl: '',
           healthCertificateExpireDate: '',
           introduction: ''
         }
@@ -120,6 +168,9 @@
         if (this.isNew) return '提交入驻申请'
         if (this.isRejected) return '重新提交审核'
         return '保存资料'
+      },
+      canAddWorkImage() {
+        return this.workImageList.length < this.maxWorkImages
       }
     },
     onShow() {
@@ -144,24 +195,213 @@
         if (Array.isArray(value)) return value.join('、')
         return value || ''
       },
+      toArray(value) {
+        if (Array.isArray(value)) return value.filter(Boolean)
+        return String(value || '')
+          .split(/[,，、\n]/)
+          .map(item => item.trim())
+          .filter(Boolean)
+      },
+      formatDate(value) {
+        if (!value) return ''
+        return String(value).slice(0, 10)
+      },
       fill(data) {
-        this.form.realName = data.realName || data.name || ''
+        this.form.realName = data.realName || data.name || data.chefName || ''
         this.form.phone = data.phone || data.mobile || ''
         this.form.avatarUrl = data.avatarUrl || data.avatar || ''
-        this.form.workImageUrls = this.stringify(data.workImageUrls || data.workImages || data.works)
-        this.form.cuisineTags = this.stringify(data.cuisineTags || data.cuisines || data.goodAtCuisine)
-        this.form.serviceArea = this.stringify(data.serviceArea || data.serviceAreas || data.area)
-        this.form.healthCertificateExpireDate = data.healthCertificateExpireDate || data.healthCertExpireDate || data.healthExpireDate || ''
-        this.form.introduction = data.introduction || data.profile || data.description || ''
+        this.workImageList = this.toArray(data.workImageUrls || data.workImages || data.works).slice(0, this.maxWorkImages)
+        this.syncWorkImageUrls()
+        this.form.cuisineTags = this.stringify(data.cuisineTags || data.cuisines || data.goodAtCuisine || data.skillTags)
+        this.serviceAreaList = this.toServiceAreaList(data)
+        this.syncServiceAreas()
+        this.regionValue = this.toRegionValue(this.form.serviceArea)
+        this.form.healthCertificateImageUrl = data.healthCertificateImageUrl || data.healthCertImageUrl || data.healthImageUrl || ''
+        this.form.healthCertificateExpireDate = this.formatDate(data.healthCertificateExpireDate || data.healthCertExpireDate || data.healthExpireDate)
+        this.form.introduction = data.introduction || data.profile || data.description || data.intro || ''
       },
       onDateChange(e) {
         this.form.healthCertificateExpireDate = e.detail.value
+      },
+      onRegionChange(e) {
+        const value = e.detail.value || []
+        this.regionValue = value
+        const areaName = value.filter(Boolean).join(' ')
+        if (areaName && this.serviceAreaList.indexOf(areaName) === -1) {
+          this.serviceAreaList.push(areaName)
+          this.syncServiceAreas()
+        }
+      },
+      toRegionValue(value) {
+        const parts = String(value || '').split(/\s+/).filter(Boolean)
+        return parts.length >= 3 ? parts.slice(0, 3) : []
+      },
+      toServiceAreaList(data) {
+        const raw = data.serviceAreas || data.serviceArea || data.area || data.areaName || ''
+        if (Array.isArray(raw)) return raw.filter(Boolean)
+        return String(raw || '')
+          .split(/[,，、;\n；]/)
+          .map(item => item.trim())
+          .filter(Boolean)
+      },
+      chooseAvatar() {
+        if (this.uploadingAvatar) return
+        uni.chooseImage({
+          count: 1,
+          sizeType: ['compressed'],
+          sourceType: ['album', 'camera'],
+          success: res => {
+            const filePath = res.tempFilePaths && res.tempFilePaths[0]
+            if (filePath) this.uploadAvatar(filePath)
+          }
+        })
+      },
+      chooseWorkImages() {
+        if (this.uploadingWorks) return
+        const count = this.maxWorkImages - this.workImageList.length
+        if (count <= 0) return
+        uni.chooseImage({
+          count,
+          sizeType: ['compressed'],
+          sourceType: ['album', 'camera'],
+          success: res => {
+            this.uploadWorkImages(res.tempFilePaths || [])
+          }
+        })
+      },
+      chooseHealthCertificateImage() {
+        if (this.uploadingHealthCertificate) return
+        uni.chooseImage({
+          count: 1,
+          sizeType: ['compressed'],
+          sourceType: ['album', 'camera'],
+          success: res => {
+            const filePath = res.tempFilePaths && res.tempFilePaths[0]
+            if (filePath) this.uploadHealthCertificateImage(filePath)
+          }
+        })
+      },
+      uploadAvatar(filePath) {
+        this.uploadingAvatar = true
+        uni.showLoading({ title: '上传中...' })
+        uploadChefImage(filePath).then(res => {
+          const url = this.resolveUploadUrl(res)
+          if (url) {
+            this.form.avatarUrl = url
+          } else {
+            this.showUploadError('头像上传失败，请重试')
+          }
+        }).catch(() => {
+          this.showUploadError('头像上传失败，请重试')
+        }).finally(() => {
+          this.uploadingAvatar = false
+          uni.hideLoading()
+        })
+      },
+      async uploadWorkImages(filePaths) {
+        if (!filePaths.length) return
+        this.uploadingWorks = true
+        uni.showLoading({ title: '上传中...' })
+        try {
+          for (const filePath of filePaths) {
+            if (this.workImageList.length >= this.maxWorkImages) break
+            const res = await uploadChefImage(filePath)
+            const url = this.resolveUploadUrl(res)
+            if (url && this.workImageList.indexOf(url) === -1) {
+              this.workImageList.push(url)
+            } else if (!url) {
+              throw new Error('作品图上传失败')
+            }
+          }
+          this.syncWorkImageUrls()
+        } catch (error) {
+          this.showUploadError('作品图上传失败，请重试')
+        } finally {
+          this.syncWorkImageUrls()
+          this.uploadingWorks = false
+          uni.hideLoading()
+        }
+      },
+      uploadHealthCertificateImage(filePath) {
+        this.uploadingHealthCertificate = true
+        uni.showLoading({ title: '上传中...' })
+        uploadChefImage(filePath).then(res => {
+          const url = this.resolveUploadUrl(res)
+          if (url) {
+            this.form.healthCertificateImageUrl = url
+          } else {
+            this.showUploadError('健康证图片上传失败，请重试')
+          }
+        }).catch(() => {
+          this.showUploadError('健康证图片上传失败，请重试')
+        }).finally(() => {
+          this.uploadingHealthCertificate = false
+          uni.hideLoading()
+        })
+      },
+      resolveUploadUrl(res) {
+        const data = this.unwrap(res) || {}
+        return data.url || data.imgUrl || data.fileUrl || ''
+      },
+      showUploadError(message) {
+        if (this.$modal && this.$modal.showToast) {
+          this.$modal.showToast(message)
+          return
+        }
+        uni.showToast({ title: message, icon: 'none' })
+      },
+      removeAvatar() {
+        this.form.avatarUrl = ''
+      },
+      removeWorkImage(index) {
+        this.workImageList.splice(index, 1)
+        this.syncWorkImageUrls()
+      },
+      removeHealthCertificateImage() {
+        this.form.healthCertificateImageUrl = ''
+      },
+      removeServiceArea(index) {
+        this.serviceAreaList.splice(index, 1)
+        this.syncServiceAreas()
+      },
+      syncServiceAreas() {
+        this.form.serviceArea = this.serviceAreaList.join('、')
+      },
+      syncWorkImageUrls() {
+        this.form.workImageUrls = this.workImageList.join(',')
+      },
+      previewImage(url) {
+        if (!url) return
+        uni.previewImage({
+          current: url,
+          urls: [url]
+        })
+      },
+      buildPayload() {
+        this.syncWorkImageUrls()
+        this.syncServiceAreas()
+        return {
+          chefName: this.form.realName,
+          mobile: this.form.phone,
+          avatarUrl: this.form.avatarUrl,
+          workImageUrls: this.form.workImageUrls,
+          skillTags: this.form.cuisineTags,
+          areaName: this.form.serviceArea,
+          serviceArea: this.form.serviceArea,
+          serviceAreas: this.serviceAreaList,
+          healthCertificateImageUrl: this.form.healthCertificateImageUrl,
+          healthCertImageUrl: this.form.healthCertificateImageUrl,
+          healthCertExpireDate: this.form.healthCertificateExpireDate,
+          intro: this.form.introduction
+        }
       },
       validate() {
         if (!this.form.realName) return '请填写真实姓名'
         if (!/^1\d{10}$/.test(this.form.phone)) return '请填写 11 位手机号'
         if (!this.form.cuisineTags) return '请填写擅长菜系'
         if (!this.form.serviceArea) return '请填写服务区域'
+        if (this.workImageList.length > this.maxWorkImages) return '作品图最多上传 5 张'
+        if (!this.form.healthCertificateImageUrl) return '请上传健康证图片'
         if (!this.form.healthCertificateExpireDate) return '请选择健康证有效期'
         return ''
       },
@@ -173,7 +413,7 @@
         }
         const action = (this.isNew || this.isRejected) ? applyChef : updateChefMy
         this.submitting = true
-        action({ ...this.form }).then(() => {
+        action(this.buildPayload()).then(() => {
           this.$modal.msgSuccess(this.submitText + '成功')
           this.load()
         }).finally(() => {
@@ -186,7 +426,7 @@
 
 <style lang="scss" scoped>
   page {
-    background: #f5f7f5;
+    background: #fff7f0;
   }
 
   .page {
@@ -209,7 +449,7 @@
     align-items: center;
     justify-content: space-between;
     padding: 28rpx;
-    background: #17211b;
+    background: #6a3a2b;
     color: #fff;
   }
 
@@ -282,6 +522,78 @@
     font-weight: 600;
   }
 
+  .upload-row {
+    display: flex;
+    align-items: center;
+    gap: 18rpx;
+  }
+
+  .avatar-uploader,
+  .image-add,
+  .work-image {
+    position: relative;
+    width: 156rpx;
+    height: 156rpx;
+    border-radius: 8rpx;
+    overflow: hidden;
+    background: #fbfcfb;
+    box-sizing: border-box;
+  }
+
+  .avatar-uploader,
+  .image-add {
+    border: 1rpx dashed #b8c7bd;
+  }
+
+  .avatar-preview,
+  .work-image image {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+
+  .upload-placeholder,
+  .image-add {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: #6d7b72;
+    font-size: 24rpx;
+  }
+
+  .upload-plus {
+    font-size: 42rpx;
+    line-height: 1;
+    color: #2f8f55;
+  }
+
+  .upload-tip {
+    flex: 1;
+    color: #7c8980;
+    font-size: 24rpx;
+    line-height: 1.45;
+  }
+
+  .image-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 156rpx);
+    gap: 16rpx;
+  }
+
+  .image-remove {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 40rpx;
+    height: 40rpx;
+    line-height: 36rpx;
+    text-align: center;
+    background: rgba(0, 0, 0, 0.55);
+    color: #fff;
+    font-size: 32rpx;
+  }
+
   .input,
   .textarea {
     width: 100%;
@@ -306,6 +618,36 @@
 
   .picker {
     line-height: 40rpx;
+  }
+
+  .add-region {
+    color: #2f8f55;
+  }
+
+  .area-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12rpx;
+    margin-top: 14rpx;
+  }
+
+  .area-tag {
+    display: flex;
+    align-items: center;
+    max-width: 100%;
+    padding: 10rpx 14rpx;
+    border-radius: 8rpx;
+    background: #fff7f0;
+    color: #6a3a2b;
+    font-size: 24rpx;
+    line-height: 1.35;
+  }
+
+  .area-remove {
+    margin-left: 10rpx;
+    color: #a82819;
+    font-size: 30rpx;
+    line-height: 1;
   }
 
   .submit {

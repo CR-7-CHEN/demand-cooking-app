@@ -39,6 +39,6 @@
 
 <style lang="scss">
   page {
-    background-color: #ffffff;
+    background-color: #fff7f0;
   }
 </style>

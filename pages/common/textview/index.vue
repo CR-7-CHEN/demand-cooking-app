@@ -26,7 +26,7 @@
 
 <style scoped>
   page {
-    background-color: #ffffff;
+    background-color: #fff7f0;
   }
 
   .view-title {

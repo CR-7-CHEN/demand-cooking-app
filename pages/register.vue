@@ -1,9 +1,7 @@
 <template>
   <view class="normal-login-container">
     <view class="logo-content align-center justify-center flex">
-      <image style="width: 100rpx;height: 100rpx;" :src="globalConfig.appInfo.logo" mode="widthFix">
-      </image>
-      <text class="title">若依移动端注册</text>
+      <text class="title">上门做饭管理系统</text>
     </view>
     <view class="login-form-content">
       <view class="input-item flex align-center">
@@ -18,15 +16,8 @@
         <view class="iconfont icon-password icon"></view>
         <input v-model="registerForm.confirmPassword" type="password" class="input" placeholder="请输入重复密码" maxlength="20" />
       </view>
-      <view class="input-item flex align-center" style="width: 60%;margin: 0px;" v-if="captchaEnabled">
-        <view class="iconfont icon-code icon"></view>
-        <input v-model="registerForm.code" type="number" class="input" placeholder="请输入验证码" maxlength="4" />
-        <view class="login-code"> 
-          <image :src="codeUrl" @click="getCode" class="login-code-img"></image>
-        </view>
-      </view>
       <view class="action-btn">
-        <button @click="handleRegister()" class="register-btn cu-btn block bg-blue lg round">注册</button>
+        <button @click="handleRegister()" class="register-btn cu-btn block lg round" hover-class="register-btn-hover">注册</button>
       </view>
     </view>
     <view class="xieyi text-center">
@@ -36,40 +27,23 @@
 </template>
 
 <script>
-  import { getCodeImg, register } from '@/api/login'
+  import { register } from '@/api/login'
 
   export default {
     data() {
       return {
-        codeUrl: "",
-        captchaEnabled: true,
         globalConfig: getApp().globalData.config,
         registerForm: {
           username: "",
           password: "",
-          confirmPassword: "",
-          code: "",
-          uuid: ""
+          confirmPassword: ""
         }
       }
-    },
-    created() {
-      this.getCode()
     },
     methods: {
       // 用户登录
       handleUserLogin() {
         this.$tab.navigateTo(`/pages/login`)
-      },
-      // 获取图形验证码
-      getCode() {
-        getCodeImg().then(res => {
-          this.captchaEnabled = res.captchaEnabled === undefined ? true : res.captchaEnabled
-          if (this.captchaEnabled) {
-            this.codeUrl = 'data:image/gif;base64,' + res.img
-            this.registerForm.uuid = res.uuid
-          }
-        })
       },
       // 注册方法
       async handleRegister() {
@@ -81,8 +55,6 @@
           this.$modal.msgError("请再次输入您的密码")
         } else if (this.registerForm.password !== this.registerForm.confirmPassword) {
           this.$modal.msgError("两次输入的密码不一致")
-        } else if (this.registerForm.code === "" && this.captchaEnabled) {
-          this.$modal.msgError("请输入验证码")
         } else {
           this.$modal.loading("注册中，请耐心等待...")
           this.register()
@@ -102,9 +74,7 @@
           	}
           })
         }).catch(() => {
-          if (this.captchaEnabled) {
-            this.getCode()
-          }
+          this.$modal.closeLoading()
         })
       }
     }
@@ -113,7 +83,7 @@
 
 <style lang="scss" scoped>
   page {
-    background-color: #ffffff;
+    background-color: #fff7f0;
   }
 
   .normal-login-container {
@@ -125,12 +95,10 @@
       text-align: center;
       padding-top: 15%;
 
-      image {
-        border-radius: 4px;
-      }
-
       .title {
-        margin-left: 10px;
+        margin-left: 0;
+        font-weight: bold;
+        color: #333;
       }
     }
 
@@ -142,7 +110,7 @@
 
       .input-item {
         margin: 20px auto;
-        background-color: #f5f6f7;
+        background-color: #fff1e8;
         height: 45px;
         border-radius: 20px;
 
@@ -165,6 +133,17 @@
       .register-btn {
         margin-top: 40px;
         height: 45px;
+        background-color: #f06a3a;
+        color: #ffffff;
+        border: 1px solid #f06a3a;
+        box-sizing: border-box;
+      }
+
+      .register-btn-hover {
+        background-color: #e45f30;
+        border-color: #e45f30;
+        opacity: 0.9;
+        transform: scale(0.98);
       }
 
       .xieyi {
@@ -172,17 +151,6 @@
         margin-top: 20px;
       }
       
-      .login-code {
-        height: 38px;
-        float: right;
-      
-        .login-code-img {
-          height: 38px;
-          position: absolute;
-          margin-left: 10px;
-          width: 200rpx;
-        }
-      }
     }
   }
 

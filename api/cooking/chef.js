@@ -1,4 +1,5 @@
 import request from '@/utils/request'
+import upload from '@/utils/upload'
 
 // 做饭人员资料
 export function getChefMy() {
@@ -21,6 +22,14 @@ export function updateChefMy(data) {
     url: '/cooking/chef/my',
     method: 'put',
     data
+  })
+}
+
+export function uploadChefImage(filePath) {
+  return upload({
+    url: '/cooking/chef/upload',
+    name: 'file',
+    filePath
   })
 }
 

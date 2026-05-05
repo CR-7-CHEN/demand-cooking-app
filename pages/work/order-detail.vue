@@ -244,7 +244,7 @@
 
 <style lang="scss" scoped>
   page {
-    background: #f5f7f5;
+    background: #fff7f0;
   }
 
   .page {
@@ -267,7 +267,7 @@
     align-items: center;
     justify-content: space-between;
     padding: 28rpx;
-    background: #17211b;
+    background: #6a3a2b;
     color: #fff;
   }
 

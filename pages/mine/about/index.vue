@@ -3,42 +3,40 @@
     <view class="header-section text-center">
       <image style="width: 150rpx;height: 150rpx;" src="/static/logo200.png" mode="widthFix">
       </image>
-      <uni-title type="h2" title="若依移动端"></uni-title>
+      <uni-title type="h2" title="上门做饭"></uni-title>
     </view>
 
     <view class="content-section">
       <view class="menu-list">
         <view class="list-cell list-cell-arrow">
           <view class="menu-item-box">
-            <view>版本信息</view>
+            <view>当前版本</view>
             <view class="text-right">v{{version}}</view>
           </view>
         </view>
         <view class="list-cell list-cell-arrow">
           <view class="menu-item-box">
-            <view>官方邮箱</view>
-            <view class="text-right">ruoyi@xx.com</view>
+            <view>服务邮箱</view>
+            <view class="text-right">service@demand-cooking.local</view>
           </view>
         </view>
         <view class="list-cell list-cell-arrow">
           <view class="menu-item-box">
-            <view>服务热线</view>
-            <view class="text-right">400-999-9999</view>
+            <view>服务范围</view>
+            <view class="text-right">家常菜、宴客餐、备餐</view>
           </view>
         </view>
         <view class="list-cell list-cell-arrow">
           <view class="menu-item-box">
-            <view>公司网站</view>
-            <view class="text-right">
-              <uni-link :href="url" :text="url" showUnderLine="false"></uni-link>
-            </view>
+            <view>业务介绍</view>
+            <view class="text-right">按需预约厨师上门</view>
           </view>
         </view>
       </view>
     </view>
 
     <view class="copyright">
-      <view>Copyright &copy; 2025 ruoyi.vip All Rights Reserved.</view>
+      <view>专注家庭餐桌的上门做饭服务</view>
     </view>
   </view>
 </template>
@@ -47,7 +45,6 @@
   export default {
     data() {
       return {
-        url: getApp().globalData.config.appInfo.site_url,
         version: getApp().globalData.config.appInfo.version
       }
     }
@@ -56,7 +53,7 @@
 
 <style lang="scss" scoped>
   page {
-    background-color: #f8f8f8;
+    background-color: #fff7f0;
   }
 
   .copyright {

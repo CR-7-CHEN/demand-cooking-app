@@ -28,7 +28,7 @@
           <view class="order-no">{{ order.orderNo || '预约订单' }}</view>
           <view class="status">{{ statusText(order.status) }}</view>
         </view>
-        <view class="line">做饭人员：{{ order.chefName || order.chef?.name || '待确认' }}</view>
+        <view class="line">做饭人员：{{ chefDisplayName(order) }}</view>
         <view class="line">上门时间：{{ order.startTime || order.appointmentStartTime || order.serviceStartTime || '-' }}</view>
         <view class="line">服务区域：{{ order.serviceArea || order.areaName || '-' }}</view>
         <view class="footer">
@@ -94,6 +94,9 @@
           price: item.price || item.totalPrice || item.quoteAmount
         }
       },
+      chefDisplayName(order) {
+        return order.chefName || (order.chef && order.chef.name) || '待确认'
+      },
       changeStatus(status) {
         this.activeStatus = status
         this.loadOrders()
@@ -129,7 +132,7 @@
   page,
   .page {
     min-height: 100vh;
-    background: #f7f8f5;
+    background: #fff7f0;
   }
 
   .page {

@@ -125,7 +125,7 @@
 
 <style lang="scss" scoped>
   page {
-    background-color: #f5f6f7;
+    background-color: #fff7f0;
   }
 
   .mine-container {
@@ -135,7 +135,7 @@
 
     .header-section {
       padding: 15px 15px 45px 15px;
-      background-color: #3c96f3;
+      background-color: #f06a3a;
       color: white;
 
       .login-tip {

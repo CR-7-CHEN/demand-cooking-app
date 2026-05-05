@@ -165,7 +165,7 @@
 
 <style lang="scss" scoped>
   page {
-    background: #f5f7f5;
+    background: #fff7f0;
   }
 
   .page {
@@ -193,7 +193,7 @@
   }
 
   .tab.active {
-    background: #17211b;
+    background: #6a3a2b;
     color: #fff;
     font-weight: 600;
   }

@@ -14,7 +14,11 @@
           <input v-model="query.keyword" confirm-type="search" placeholder="搜索姓名、菜系、区域" @confirm="loadChefs" />
         </view>
         <view class="filter-row">
-          <input v-model="query.serviceArea" placeholder="服务区域，如朝阳区" />
+          <picker class="region-picker" mode="region" :value="regionValue" @change="onRegionChange">
+            <view class="region-value" :class="{ placeholder: !query.serviceArea }">
+              {{ serviceAreaLabel || query.serviceArea || '选择服务区域' }}
+            </view>
+          </picker>
           <button @click="loadChefs">筛选</button>
         </view>
       </view>
@@ -84,6 +88,8 @@
           keyword: '',
           serviceArea: ''
         },
+        serviceAreaLabel: '',
+        regionValue: [],
         chefs: []
       }
     },
@@ -103,6 +109,13 @@
         }).finally(() => {
           this.loading = false
         })
+      },
+      onRegionChange(event) {
+        const region = event.detail && event.detail.value ? event.detail.value : []
+        this.regionValue = region
+        this.serviceAreaLabel = region.filter(Boolean).join(' ')
+        this.query.serviceArea = region[2] || region[1] || region[0] || ''
+        this.loadChefs()
       },
       pickList(res) {
         if (Array.isArray(res)) return res
@@ -161,19 +174,19 @@
 
 <style lang="scss" scoped>
   page {
-    background: #f7f8f5;
+    background: #fff7f0;
   }
 
   .cook-home {
     min-height: 100vh;
     padding-bottom: 40rpx;
-    background: #f7f8f5;
+    background: #fff7f0;
   }
 
   .hero {
     padding: 72rpx 32rpx 36rpx;
     color: #fff;
-    background: linear-gradient(135deg, #f05d3c 0%, #f58a4b 54%, #28a86f 100%);
+    background: linear-gradient(135deg, #f05d3c 0%, #f58a4b 58%, #ffc46b 100%);
   }
 
   .hero-top {
@@ -227,8 +240,7 @@
     border-bottom: 1rpx solid #f1e7de;
   }
 
-  .search-row input,
-  .filter-row input {
+  .search-row input {
     flex: 1;
     height: 54rpx;
     color: #26332e;
@@ -237,6 +249,25 @@
 
   .filter-row {
     padding-top: 18rpx;
+  }
+
+  .region-picker {
+    min-width: 0;
+    flex: 1;
+  }
+
+  .region-value {
+    height: 54rpx;
+    line-height: 54rpx;
+    color: #26332e;
+    font-size: 28rpx;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .region-value.placeholder {
+    color: #999;
   }
 
   .filter-row button {

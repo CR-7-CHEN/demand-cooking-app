@@ -60,7 +60,7 @@
 
 <style lang="scss" scoped>
   .page {
-    background-color: #f8f8f8;
+    background-color: #fff7f0;
   }
 
   .item-box {

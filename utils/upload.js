@@ -1,19 +1,28 @@
 import store from '@/store'
-import config from '@/config'
-import { getToken } from '@/utils/auth'
+import appConfig from '@/config'
+import { getToken, getClientId } from '@/utils/auth'
 import errorCode from '@/utils/errorCode'
 import { toast, showConfirm, tansParams } from '@/utils/common'
 
 let timeout = 10000
-const baseUrl = config.baseUrl
+const baseUrl = appConfig.baseUrl
+const defaultClientId = appConfig.passwordClientId || appConfig.clientId
 
 const upload = config => {
   // 是否需要设置 token
   const isToken = (config.headers || {}).isToken === false
-  config.header = config.header || {}
+  config.header = {
+    ...(config.headers || {}),
+    ...(config.header || {})
+  }
+  const authClientId = getToken() && !isToken ? getClientId() : ''
+  if (!config.header.clientid) {
+    config.header.clientid = authClientId || defaultClientId
+  }
   if (getToken() && !isToken) {
     config.header['Authorization'] = 'Bearer ' + getToken()
   }
+  delete config.header.isToken
   // get请求映射params参数
   if (config.params) {
     let url = config.url + '?' + tansParams(config.params)

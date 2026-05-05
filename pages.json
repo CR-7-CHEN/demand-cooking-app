@@ -12,7 +12,7 @@
   }, {
     "path": "pages/index",
     "style": {
-      "navigationBarTitleText": "若依移动端框架",
+      "navigationBarTitleText": "上门做饭",
       "navigationStyle": "custom"
     }
   }, {
@@ -113,9 +113,9 @@
   }],
   "tabBar": {
     "color": "#000000",
-    "selectedColor": "#000000",
+    "selectedColor": "#f06a3a",
     "borderStyle": "white",
-    "backgroundColor": "#ffffff",
+    "backgroundColor": "#fff7f0",
     "list": [{
         "pagePath": "pages/index",
         "iconPath": "static/images/tabbar/home.png",
@@ -136,7 +136,7 @@
   },
   "globalStyle": {
     "navigationBarTextStyle": "black",
-    "navigationBarTitleText": "RuoYi",
-    "navigationBarBackgroundColor": "#FFFFFF"
+    "navigationBarTitleText": "上门做饭",
+    "navigationBarBackgroundColor": "#fff7f0"
   }
 }

@@ -29,5 +29,9 @@
 </script>
 
 <style lang="scss">
-  @import '@/static/scss/index.scss'
+  @import '@/static/scss/index.scss';
+
+  page {
+    background-color: #fff7f0;
+  }
 </style>

@@ -225,7 +225,7 @@
   page,
   .page {
     min-height: 100vh;
-    background: #f7f8f5;
+    background: #fff7f0;
   }
 
   .page {

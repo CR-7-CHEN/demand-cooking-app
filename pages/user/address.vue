@@ -11,7 +11,12 @@
     <view v-if="loading" class="state">地址加载中...</view>
     <view v-else-if="addresses.length === 0" class="state">还没有地址，先新增一个上门地址</view>
     <view v-else class="list">
-      <view v-for="item in addresses" :key="item.id || item.fullAddress" class="address-card">
+      <view
+        v-for="item in addresses"
+        :key="item.id || item.fullAddress"
+        class="address-card"
+        :class="{ default: item.isDefault }"
+      >
         <view class="card-main">
           <view class="name-row">
             <text class="name">{{ item.contactName }}</text>
@@ -39,7 +44,11 @@
       </view>
       <view class="field">
         <text>所在区域</text>
-        <input v-model="form.region" placeholder="如朝阳区/浦东新区" />
+        <picker mode="region" :value="regionValue" @change="changeRegion">
+          <view class="picker-value" :class="{ placeholder: !form.region }">
+            {{ form.region || '请选择省/市/区' }}
+          </view>
+        </picker>
       </view>
       <view class="field">
         <text>详细地址</text>
@@ -66,6 +75,7 @@
       return {
         loading: false,
         saving: false,
+        regionValue: [],
         addresses: [],
         form: this.blankForm()
       }
@@ -107,6 +117,7 @@
         const region = item.region || item.area || item.district || ''
         const detail = item.detailAddress || item.address || item.detail || ''
         const house = item.houseNumber || item.doorNo || item.houseNo || ''
+        const isDefault = this.normalizeDefault(item.isDefault, item.defaultFlag)
         return {
           id: item.id || item.addressId,
           contactName: item.contactName || item.name || item.receiver || '',
@@ -115,11 +126,21 @@
           detailAddress: detail,
           houseNumber: house,
           fullAddress: [region, detail, house].filter(Boolean).join(' '),
-          isDefault: item.isDefault || item.defaultFlag
+          isDefault
         }
+      },
+      normalizeDefault(...values) {
+        return values.some(value => value === true || value === 1 || value === '1' || value === 'true' || value === 'Y')
+      },
+      parseRegionValue(region) {
+        if (!region) return []
+        if (Array.isArray(region)) return region.filter(Boolean)
+        const parts = String(region).split(/[\s/,-]+/).filter(Boolean)
+        return parts.length === 3 ? parts : []
       },
       startAdd() {
         this.form = this.blankForm()
+        this.regionValue = []
       },
       startEdit(item) {
         this.form = {
@@ -131,6 +152,12 @@
           houseNumber: item.houseNumber,
           isDefault: !!item.isDefault
         }
+        this.regionValue = this.parseRegionValue(item.region)
+      },
+      changeRegion(e) {
+        const value = e.detail.value || []
+        this.regionValue = value
+        this.form.region = value.filter(Boolean).join(' ')
       },
       changeDefault(e) {
         this.form.isDefault = e.detail.value
@@ -145,7 +172,7 @@
           return false
         }
         if (!this.form.region.trim()) {
-          this.$modal.msg('请填写所在区域')
+          this.$modal.msg('请选择所在区域')
           return false
         }
         if (!this.form.detailAddress.trim()) {
@@ -158,9 +185,14 @@
         if (!this.validate()) return
         this.saving = true
         const action = this.form.id ? updateAddress : addAddress
-        action(this.form).then(() => {
+        const payload = {
+          ...this.form,
+          defaultFlag: this.form.isDefault ? 1 : 0
+        }
+        action(payload).then(() => {
           this.$modal.msgSuccess('地址已保存')
           this.form = this.blankForm()
+          this.regionValue = []
           this.load()
         }).finally(() => {
           this.saving = false
@@ -191,7 +223,7 @@
   page,
   .page {
     min-height: 100vh;
-    background: #f7f8f5;
+    background: #fff7f0;
   }
 
   .page {
@@ -259,6 +291,11 @@
   .address-card {
     padding: 24rpx;
     margin-bottom: 18rpx;
+  }
+
+  .address-card.default {
+    border: 1rpx solid #2f7d58;
+    background: #fbfffd;
   }
 
   .name-row {
@@ -329,6 +366,23 @@
     color: #26322d;
     text-align: right;
     font-size: 27rpx;
+  }
+
+  .field picker {
+    flex: 1;
+    margin-left: 24rpx;
+  }
+
+  .picker-value {
+    min-height: 68rpx;
+    line-height: 68rpx;
+    color: #26322d;
+    text-align: right;
+    font-size: 27rpx;
+  }
+
+  .picker-value.placeholder {
+    color: #b6bdb9;
   }
 
   .save-btn {
