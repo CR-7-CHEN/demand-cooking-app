@@ -69,6 +69,8 @@
 		data() {
 			return {
 				imageSrc: store.getters.avatar,
+				selectedImagePath: '',
+				uploading: false,
 				isShowImg: false,
 				// 初始化的宽高
 				cropperInitW: SCREEN_WIDTH,
@@ -113,16 +115,36 @@
 			getImage: function () {
 				var _this = this
 				uni.chooseImage({
+					count: 1,
+					sizeType: ['compressed'],
+					sourceType: ['album', 'camera'],
 					success: function (res) {
+						const filePath = _this.getChosenFilePath(res)
+						if (!filePath) {
+							_this.showToast('未获取到图片，请重新选择')
+							return
+						}
+						if (!_this.isSupportedImage(filePath)) {
+							_this.showToast('暂不支持 webp 格式，请选择 jpg、jpeg、png、gif 或 bmp 图片')
+							return
+						}
 						_this.setData({
-							imageSrc: res.tempFilePaths[0],
+							imageSrc: filePath,
+							selectedImagePath: filePath,
 						})
 						_this.loadImage()
 					},
+					fail: function (error) {
+						_this.showToast(_this.isCancel(error) ? '已取消选择' : '选择图片失败，请重试')
+					}
 				})
 			},
 			loadImage: function () {
 				var _this = this
+				if (!_this.imageSrc) {
+					_this.setData({ isShowImg: false })
+					return
+				}
 
 				uni.getImageInfo({
 					src: _this.imageSrc,
@@ -188,6 +210,11 @@
 							isShowImg: true
 						})
 						uni.hideLoading()
+					},
+					fail: function () {
+						_this.setData({ isShowImg: false })
+						uni.hideLoading()
+						_this.showToast('图片加载失败，请选择 jpg、jpeg、png、gif 或 bmp 格式')
 					}
 				})
 			},
@@ -232,18 +259,59 @@
 			// 获取图片
 			getImageInfo() {
 				var _this = this
-				uni.showLoading({
-					title: '图片生成中...',
+				if (_this.uploading) return
+				if (!_this.selectedImagePath) {
+					_this.showToast('请先选择头像图片')
+					return
+				}
+				if (!_this.isSupportedImage(_this.selectedImagePath)) {
+					_this.showToast('暂不支持 webp 格式，请选择 jpg、jpeg、png、gif 或 bmp 图片')
+					return
+				}
+				_this.uploadSelectedAvatar(_this.selectedImagePath)
+			},
+			uploadSelectedAvatar(filePath) {
+				var _this = this
+				_this.uploading = true
+				uni.showLoading({ title: '上传中...' })
+				uploadAvatar({ name: 'avatarfile', filePath }).then(response => {
+					const avatarUrl = _this.resolveAvatarUrl(response)
+					if (!avatarUrl) {
+						_this.showToast('头像上传成功，但未返回头像地址')
+						return
+					}
+					store.commit('SET_AVATAR', _this.normalizeAvatarUrl(avatarUrl))
+					uni.showToast({ title: "修改成功", icon: 'success' })
+					setTimeout(() => {
+						uni.navigateBack()
+					}, 300)
+				}).catch(() => {
+					_this.showToast('头像上传失败，请重试')
+				}).finally(() => {
+					_this.uploading = false
+					uni.hideLoading()
 				})
-				// 将图片写入画布
-				const ctx = uni.createCanvasContext('myCanvas')
-				ctx.drawImage(_this.imageSrc, 0, 0, IMG_REAL_W, IMG_REAL_H)
-				ctx.draw(true, () => {
+			},
+			getCroppedImageInfo() {
+				var _this = this
+				try {
+					uni.showLoading({
+						title: '图片生成中...',
+					})
+					// 将图片写入画布
+					const ctx = uni.createCanvasContext('myCanvas')
+					ctx.drawImage(_this.imageSrc, 0, 0, IMG_REAL_W, IMG_REAL_H)
+					ctx.draw(true, () => {
 					// 获取画布要裁剪的位置和宽度   均为百分比 * 画布中图片的宽度    保证了在微信小程序中裁剪的图片模糊  位置不对的问题 canvasT = (_this.cutT / _this.cropperH) * (_this.imageH / pixelRatio)
 					var canvasW = ((_this.cropperW - _this.cutL - _this.cutR) / _this.cropperW) * IMG_REAL_W
 					var canvasH = ((_this.cropperH - _this.cutT - _this.cutB) / _this.cropperH) * IMG_REAL_H
 					var canvasL = (_this.cutL / _this.cropperW) * IMG_REAL_W
 					var canvasT = (_this.cutT / _this.cropperH) * IMG_REAL_H
+					if (!canvasW || !canvasH) {
+						uni.hideLoading()
+						_this.showToast('头像裁剪区域无效，请重新选择图片')
+						return
+					}
 					uni.canvasToTempFilePath({
 						x: canvasL,
 						y: canvasT,
@@ -255,15 +323,29 @@
 						canvasId: 'myCanvas',
 						success: function (res) {
 							uni.hideLoading()
+							if (!res.tempFilePath) {
+								_this.showToast('头像裁剪失败，请重新选择图片')
+								return
+							}
 							let data = {name: 'avatarfile', filePath: res.tempFilePath}
 							uploadAvatar(data).then(response => {
-								store.commit('SET_AVATAR', baseUrl + response.imgUrl)
+								store.commit('SET_AVATAR', _this.normalizeAvatarUrl(_this.resolveAvatarUrl(response)))
 								uni.showToast({ title: "修改成功", icon: 'success' })
 								uni.navigateBack()
+							}).catch(() => {
+								_this.showToast('头像上传失败，请重试')
 							})
+						},
+						fail: function () {
+							uni.hideLoading()
+							_this.showToast('头像裁剪失败，请重新选择图片')
 						}
 					})
-				})
+					})
+				} catch (error) {
+					uni.hideLoading()
+					_this.showToast('头像处理失败，请重新选择图片')
+				}
 			},
 			// 设置大小的时候触发的touchStart事件
 			dragStart(e) {
@@ -327,6 +409,32 @@
 					default:
 						break
 				}
+			},
+			normalizeAvatarUrl(url) {
+				if (!url) return ''
+				if (/^https?:\/\//i.test(url)) return url
+				if (url.indexOf(baseUrl) === 0) return url
+				return baseUrl + url
+			},
+			resolveAvatarUrl(response) {
+				const data = response && response.data ? response.data : response
+				return (data && (data.imgUrl || data.url || data.avatar)) || ''
+			},
+			getChosenFilePath(res) {
+				if (res && res.tempFilePaths && res.tempFilePaths[0]) return res.tempFilePaths[0]
+				if (res && res.tempFiles && res.tempFiles[0]) return res.tempFiles[0].path || res.tempFiles[0].tempFilePath
+				return ''
+			},
+			isSupportedImage(filePath) {
+				const extension = String(filePath || '').split('?')[0].split('.').pop().toLowerCase()
+				if (!extension || extension === filePath) return true
+				return ['bmp', 'gif', 'jpg', 'jpeg', 'png'].indexOf(extension) !== -1
+			},
+			isCancel(error) {
+				return error && String(error.errMsg || error.message || '').toLowerCase().indexOf('cancel') !== -1
+			},
+			showToast(title) {
+				uni.showToast({ title, icon: 'none' })
 			}
 		}
 	}

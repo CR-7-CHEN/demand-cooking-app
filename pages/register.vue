@@ -14,7 +14,7 @@
       </view>
       <view class="input-item flex align-center">
         <view class="iconfont icon-password icon"></view>
-        <input v-model="registerForm.confirmPassword" type="password" class="input" placeholder="请输入重复密码" maxlength="20" />
+        <input v-model="registerForm.confirmPassword" type="password" class="input" placeholder="请再次输入密码" maxlength="20" />
       </view>
       <view class="action-btn">
         <button @click="handleRegister()" class="register-btn cu-btn block lg round" hover-class="register-btn-hover">注册</button>
@@ -27,8 +27,6 @@
 </template>
 
 <script>
-  import { register } from '@/api/login'
-
   export default {
     data() {
       return {
@@ -41,11 +39,9 @@
       }
     },
     methods: {
-      // 用户登录
       handleUserLogin() {
         this.$tab.navigateTo(`/pages/login`)
       },
-      // 注册方法
       async handleRegister() {
         if (this.registerForm.username === "") {
           this.$modal.msgError("请输入您的账号")
@@ -60,22 +56,59 @@
           this.register()
         }
       },
-      // 用户注册
       async register() {
-        register(this.registerForm).then(res => {
+        let registerInfo = {}
+        try {
+          registerInfo = await this.getRegisterLoginInfo()
+        } catch (error) {
           this.$modal.closeLoading()
-          uni.showModal({
-          	title: "系统提示",
-          	content: "恭喜你，您的账号 " + this.registerForm.username + " 注册成功！",
-          	success: function (res) {
-          		if (res.confirm) {
-                uni.redirectTo({ url: `/pages/login` });
-          		}
-          	}
+          this.$modal.msgError(error.message || '微信登录凭证获取失败，请重试')
+          return
+        }
+        this.$store.dispatch('Register', {
+          ...this.registerForm,
+          ...registerInfo
+        }).then(() => {
+          this.$modal.closeLoading()
+          this.$store.dispatch('GetInfo').then(() => {
+            this.$tab.reLaunch('/pages/index')
           })
         }).catch(() => {
           this.$modal.closeLoading()
         })
+      },
+      getRegisterLoginInfo() {
+        return new Promise((resolve, reject) => {
+          // #ifdef MP-WEIXIN
+          uni.login({
+            success: ({ code }) => {
+              if (!code) {
+                reject(new Error('未获取到微信登录凭证，请重试'))
+                return
+              }
+              resolve({
+                xcxCode: code,
+                appid: this.getMiniProgramAppId()
+              })
+            },
+            fail: () => {
+              reject(new Error('微信登录凭证获取失败，请重试'))
+            }
+          })
+          // #endif
+          // #ifndef MP-WEIXIN
+          resolve({})
+          // #endif
+        })
+      },
+      getMiniProgramAppId() {
+        // #ifdef MP-WEIXIN
+        const accountInfo = uni.getAccountInfoSync ? uni.getAccountInfoSync() : null
+        return accountInfo && accountInfo.miniProgram ? accountInfo.miniProgram.appId : ''
+        // #endif
+        // #ifndef MP-WEIXIN
+        return ''
+        // #endif
       }
     }
   }
@@ -127,7 +160,6 @@
           text-align: left;
           padding-left: 15px;
         }
-
       }
 
       .register-btn {
@@ -150,8 +182,6 @@
         color: #333;
         margin-top: 20px;
       }
-      
     }
   }
-
 </style>

@@ -1,10 +1,10 @@
 <template>
   <view class="mine-container" :style="{height: `${windowHeight}px`}">
-    <!--顶部个人信息栏-->
+    <!--顶部用户信息栏-->
     <view class="header-section">
       <view class="flex padding justify-between">
         <view class="flex align-center">
-          <view v-if="!avatar" class="cu-avatar xl round bg-white">
+          <view v-if="!avatar" @click="handleToAvatar" class="cu-avatar xl round bg-white">
             <view class="iconfont icon-people text-gray icon"></view>
           </view>
           <image v-if="avatar" @click="handleToAvatar" :src="avatar" class="cu-avatar xl round" mode="widthFix">
@@ -12,32 +12,23 @@
           <view v-if="!name" @click="handleToLogin" class="login-tip">
             点击登录
           </view>
-          <view v-if="name" @click="handleToInfo" class="user-info">
+          <view v-if="name" class="user-info">
             <view class="u_title">
               用户名：{{ name }}
             </view>
+            <view class="u_nickname">
+              用户昵称：{{ nickName || '未设置' }}
+            </view>
           </view>
-        </view>
-        <view @click="handleToInfo" class="flex align-center">
-          <text>个人信息</text>
-          <view class="iconfont icon-right"></view>
         </view>
       </view>
     </view>
 
     <view class="content-section">
-      <view class="mine-actions grid col-4 text-center">
-        <view class="action-item" @click="handleJiaoLiuQun">
-          <view class="iconfont icon-friendfill text-pink icon"></view>
-          <text class="text">交流群</text>
-        </view>
-        <view class="action-item" @click="handleBuilding">
+      <view class="mine-actions grid col-2 text-center">
+        <view class="action-item" @click="handleCustomerService">
           <view class="iconfont icon-service text-blue icon"></view>
           <text class="text">在线客服</text>
-        </view>
-        <view class="action-item" @click="handleBuilding">
-          <view class="iconfont icon-community text-mauve icon"></view>
-          <text class="text">反馈社区</text>
         </view>
         <view class="action-item" @click="handleBuilding">
           <view class="iconfont icon-dianzan text-green icon"></view>
@@ -77,11 +68,18 @@
 </template>
 
 <script>
+  import { getAppProfile } from "@/api/system/user"
+
   export default {
     data() {
       return {
-        name: this.$store.state.user.name
+        name: this.$store.state.user.name,
+        nickName: ''
       }
+    },
+    onShow() {
+      this.name = this.$store.state.user.name
+      this.getProfile()
     },
     computed: {
       avatar() {
@@ -92,9 +90,6 @@
       }
     },
     methods: {
-      handleToInfo() {
-        this.$tab.navigateTo('/pages/mine/info/index')
-      },
       handleToEditInfo() {
         this.$tab.navigateTo('/pages/mine/info/edit')
       },
@@ -110,11 +105,18 @@
       handleHelp() {
         this.$tab.navigateTo('/pages/mine/help/index')
       },
+      handleCustomerService() {
+        this.$tab.navigateTo('/pages/mine/service/index')
+      },
       handleAbout() {
         this.$tab.navigateTo('/pages/mine/about/index')
       },
-      handleJiaoLiuQun() {
-        this.$modal.showToast('QQ群：①133713780(满)、②146013835(满)、③189091635')
+      getProfile() {
+        if (!this.$store.state.user.token) return
+        getAppProfile().then(response => {
+          const user = response.data || {}
+          this.nickName = user.nickName || ''
+        }).catch(() => {})
       },
       handleBuilding() {
         this.$modal.showToast('模块建设中~')
@@ -157,6 +159,12 @@
         .u_title {
           font-size: 18px;
           line-height: 30px;
+        }
+
+        .u_nickname {
+          font-size: 13px;
+          line-height: 22px;
+          color: rgba(255, 255, 255, 0.86);
         }
       }
     }

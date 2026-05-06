@@ -31,10 +31,27 @@ export function updateUserProfile(data) {
   })
 }
 
+// 查询小程序用户资料
+export function getAppProfile() {
+  return request({
+    url: '/cooking/app/profile',
+    method: 'get'
+  })
+}
+
+// 修改小程序用户资料，仅支持昵称和头像
+export function updateAppProfile(data) {
+  return request({
+    url: '/cooking/app/profile',
+    method: 'put',
+    data: data
+  })
+}
+
 // 用户头像上传
 export function uploadAvatar(data) {
   return upload({
-    url: '/system/user/profile/avatar',
+    url: '/cooking/app/profile/avatar',
     name: data.name,
     filePath: data.filePath
   })

@@ -101,7 +101,7 @@
         return this.normalize(this.order.status || this.order.orderStatus)
       },
       group() {
-        if (['WAIT_CHEF_RESPONSE', 'PENDING_RESPONSE', 'WAIT_RESPONSE'].indexOf(this.status) > -1) return 'response'
+        if (['WAITING_RESPONSE', 'WAIT_CHEF_RESPONSE', 'PENDING_RESPONSE', 'WAIT_RESPONSE'].indexOf(this.status) > -1) return 'response'
         if (['QUOTE_DISPUTE', 'QUOTE_OBJECTION', 'DISPUTE'].indexOf(this.status) > -1) return 'dispute'
         if (['WAIT_SERVICE', 'PENDING_SERVICE'].indexOf(this.status) > -1) return 'service'
         if (['WAIT_USER_CONFIRM', 'PENDING_CONFIRM', 'WAIT_CONFIRM'].indexOf(this.status) > -1) return 'confirm'
@@ -110,7 +110,7 @@
       },
       statusText() {
         const map = {
-          response: '待响应',
+          response: '待接单报价',
           dispute: '报价异议',
           service: '待服务',
           confirm: '待确认',

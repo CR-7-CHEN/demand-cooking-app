@@ -2,17 +2,15 @@
   <view class="container">
     <view class="example">
       <uni-forms ref="form" :model="user" labelWidth="80px">
+        <view class="avatar-row" @click="handleToAvatar">
+          <view class="avatar-label">用户头像</view>
+          <view class="avatar-value">
+            <image class="avatar" :src="avatar" mode="aspectFill"></image>
+            <view class="iconfont icon-right"></view>
+          </view>
+        </view>
         <uni-forms-item label="用户昵称" name="nickName">
           <uni-easyinput v-model="user.nickName" placeholder="请输入昵称" />
-        </uni-forms-item>
-        <uni-forms-item label="手机号码" name="phonenumber">
-          <uni-easyinput v-model="user.phonenumber" placeholder="请输入手机号码" />
-        </uni-forms-item>
-        <uni-forms-item label="邮箱" name="email">
-          <uni-easyinput v-model="user.email" placeholder="请输入邮箱" />
-        </uni-forms-item>
-        <uni-forms-item label="性别" name="sex" required>
-          <uni-data-checkbox v-model="user.sex" :localdata="sexs" />
         </uni-forms-item>
       </uni-forms>
       <button type="primary" @click="submit">提交</button>
@@ -21,51 +19,27 @@
 </template>
 
 <script>
-  import { getUserProfile } from "@/api/system/user"
-  import { updateUserProfile } from "@/api/system/user"
+  import { getAppProfile, updateAppProfile } from "@/api/system/user"
 
   export default {
     data() {
       return {
         user: {
-          nickName: "",
-          phonenumber: "",
-          email: "",
-          sex: ""
+          nickName: ""
         },
-        sexs: [{
-          text: '男',
-          value: "0"
-        }, {
-          text: '女',
-          value: "1"
-        }],
         rules: {
           nickName: {
             rules: [{
               required: true,
               errorMessage: '用户昵称不能为空'
             }]
-          },
-          phonenumber: {
-            rules: [{
-              required: true,
-              errorMessage: '手机号码不能为空'
-            }, {
-              pattern: /^1[3|4|5|6|7|8|9][0-9]\d{8}$/,
-              errorMessage: '请输入正确的手机号码'
-            }]
-          },
-          email: {
-            rules: [{
-              required: true,
-              errorMessage: '邮箱地址不能为空'
-            }, {
-              format: 'email',
-              errorMessage: '请输入正确的邮箱地址'
-            }]
           }
         }
+      }
+    },
+    computed: {
+      avatar() {
+        return this.$store.state.user.avatar || '/static/images/profile.jpg'
       }
     },
     onLoad() {
@@ -76,14 +50,30 @@
     },
     methods: {
       getUser() {
-        getUserProfile().then(response => {
-          this.user = response.data
+        getAppProfile().then(response => {
+          const data = response.data || {}
+          this.user = {
+            nickName: data.nickName || ''
+          }
         })
+      },
+      handleToAvatar() {
+        this.$tab.navigateTo('/pages/mine/avatar/index')
       },
       submit(ref) {
         this.$refs.form.validate().then(res => {
-          updateUserProfile(this.user).then(response => {
+          updateAppProfile({
+            nickName: this.user.nickName
+          }).then(response => {
+            this.$store.dispatch('GetInfo').catch(() => {})
             this.$modal.msgSuccess("修改成功")
+            this.user = {
+              nickName: ""
+            }
+            this.$refs.form.clearValidate()
+            setTimeout(() => {
+              this.$tab.switchTab('/pages/mine/index')
+            }, 300)
           })
         })
       }
@@ -99,6 +89,35 @@
   .example {
     padding: 15px;
     background-color: #fff;
+  }
+
+  .avatar-row {
+    min-height: 96rpx;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 0 22rpx;
+    margin-bottom: 22rpx;
+    border-bottom: 1rpx solid #f1f1f1;
+  }
+
+  .avatar-label {
+    width: 80px;
+    font-size: 14px;
+    color: #606266;
+  }
+
+  .avatar-value {
+    display: flex;
+    align-items: center;
+    color: #909399;
+  }
+
+  .avatar {
+    width: 72rpx;
+    height: 72rpx;
+    border-radius: 50%;
+    margin-right: 12rpx;
   }
 
   .segmented-control {

@@ -38,7 +38,14 @@ const upload = config => {
         header: config.header,
         formData: config.formData,
         success: (res) => {
-          let result = JSON.parse(res.data)
+          let result
+          try {
+            result = JSON.parse(res.data)
+          } catch (error) {
+            toast('上传响应解析失败')
+            reject(error)
+            return
+          }
           const code = result.code || 200
           const msg = errorCode[code] || result.msg || errorCode['default']
           if (code === 200) {
@@ -61,7 +68,7 @@ const upload = config => {
           }
         },
         fail: (error) => {
-          let { message } = error
+          let message = (error && (error.message || error.errMsg)) || '上传失败，请重试'
           if (message == 'Network Error') {
             message = '后端接口连接异常'
           } else if (message.includes('timeout')) {

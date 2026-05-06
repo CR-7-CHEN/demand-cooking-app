@@ -90,17 +90,81 @@
       </view>
     </view>
 
+    <view v-if="canManageTime" class="time-card">
+      <view class="section-head">
+        <view>
+          <view class="section-title">可预约时间</view>
+          <view class="section-desc">下单会按此时间段校验，并锁定默认 3 小时服务窗口</view>
+        </view>
+        <button class="small-btn" size="mini" @click="resetTimeForm">新增</button>
+      </view>
+
+      <view v-if="chefTimes.length" class="time-list">
+        <view v-for="item in chefTimes" :key="item.timeId" class="time-row">
+          <view class="time-info">
+            <text class="time-range">{{ formatTimeRange(item) }}</text>
+            <text :class="['time-status', item.status === '1' ? 'off' : 'on']">{{ timeStatusText(item.status) }}</text>
+            <text v-if="item.remark" class="time-remark">{{ item.remark }}</text>
+          </view>
+          <view class="time-actions">
+            <text class="text-action" @click="editTime(item)">编辑</text>
+            <text class="text-action danger" @click="removeTime(item)">删除</text>
+          </view>
+        </view>
+      </view>
+      <view v-else class="empty-time">暂无可预约时间，请先添加时间段</view>
+
+      <view class="time-form">
+        <view class="field">
+          <text class="label">日期</text>
+          <picker mode="date" :value="timeForm.date" @change="onTimeDateChange">
+            <view class="input picker">{{ timeForm.date || '请选择日期' }}</view>
+          </picker>
+        </view>
+        <view class="time-grid">
+          <view class="field">
+            <text class="label">开始</text>
+            <picker mode="time" :value="timeForm.startTime" @change="onStartTimeChange">
+              <view class="input picker">{{ timeForm.startTime || '请选择' }}</view>
+            </picker>
+          </view>
+          <view class="field">
+            <text class="label">结束</text>
+            <picker mode="time" :value="timeForm.endTime" @change="onEndTimeChange">
+              <view class="input picker">{{ timeForm.endTime || '请选择' }}</view>
+            </picker>
+          </view>
+        </view>
+        <view class="field">
+          <text class="label">状态</text>
+          <picker :range="timeStatusOptions" range-key="label" :value="timeStatusIndex" @change="onTimeStatusChange">
+            <view class="input picker">{{ timeStatusOptions[timeStatusIndex].label }}</view>
+          </picker>
+        </view>
+        <view class="field">
+          <text class="label">备注</text>
+          <input class="input" v-model.trim="timeForm.remark" placeholder="如 午餐档、晚餐档" />
+        </view>
+        <button class="time-submit" :loading="timeSubmitting" @click="saveTime">{{ timeForm.timeId ? '保存时间段' : '添加时间段' }}</button>
+      </view>
+    </view>
+
     <button class="submit" :loading="submitting" @click="submit">{{ submitText }}</button>
   </view>
 </template>
 
 <script>
-  import { getChefMy, applyChef, updateChefMy, uploadChefImage } from '@/api/cooking/chef'
-
-  const ACTIVE = ['APPROVED', 'AUDIT_PASS', 'PASSED', 'NORMAL', 'ENABLED']
-  const PENDING = ['PENDING', 'WAIT_AUDIT', 'AUDITING', 'APPLYING']
-  const REJECTED = ['REJECTED', 'AUDIT_REJECTED', 'REFUSED']
-  const PAUSED = ['PAUSED', 'PAUSE', 'SUSPENDED', 'STOP_TAKING']
+  import {
+    getChefMy,
+    applyChef,
+    updateChefMy,
+    uploadChefImage,
+    getChefTime,
+    addChefTime,
+    updateChefTime,
+    deleteChefTime
+  } from '@/api/cooking/chef'
+  const chefStatus = require('@/utils/chef-status')
 
   export default {
     data() {
@@ -110,10 +174,25 @@
         uploadingAvatar: false,
         uploadingWorks: false,
         uploadingHealthCertificate: false,
+        timeLoading: false,
+        timeSubmitting: false,
         maxWorkImages: 5,
         workImageList: [],
         serviceAreaList: [],
+        chefTimes: [],
         regionValue: [],
+        timeStatusOptions: [
+          { label: '启用', value: '0' },
+          { label: '停用', value: '1' }
+        ],
+        timeForm: {
+          timeId: null,
+          date: '',
+          startTime: '',
+          endTime: '',
+          status: '0',
+          remark: ''
+        },
         form: {
           realName: '',
           phone: '',
@@ -128,40 +207,40 @@
       }
     },
     computed: {
-      status() {
-        return this.normalize(this.chef.status || this.chef.auditStatus || this.chef.chefStatus || this.chef.identityStatus)
-      },
       isNew() {
-        return !this.chef.id && !this.chef.chefId && !this.status
+        return chefStatus.needChefApply(this.chef)
       },
       isRejected() {
-        return REJECTED.indexOf(this.status) > -1
+        return chefStatus.isChefRejected(this.chef)
       },
       rejectReason() {
         return this.chef.rejectReason || this.chef.auditRejectReason || this.chef.reason || ''
       },
       statusText() {
         if (this.isNew) return '未申请入驻'
-        if (ACTIVE.indexOf(this.status) > -1) return '审核通过'
-        if (PAUSED.indexOf(this.status) > -1) return '暂停接单'
-        if (PENDING.indexOf(this.status) > -1) return '待平台审核'
+        if (chefStatus.isChefApproved(this.chef) && chefStatus.isChefPaused(this.chef)) return '暂停接单'
+        if (chefStatus.isChefApproved(this.chef) && chefStatus.isChefNormal(this.chef)) return '审核通过'
+        if (chefStatus.isChefPending(this.chef)) return '待平台审核'
         if (this.isRejected) return '审核驳回'
+        if (chefStatus.isChefDisabled(this.chef)) return '已禁用'
+        if (chefStatus.isChefResigned(this.chef)) return '已离职'
         return this.chef.statusName || '资料待完善'
       },
       chipText() {
         if (this.isNew) return '可申请'
         if (this.isRejected) return '可重提'
-        if (ACTIVE.indexOf(this.status) > -1 || PAUSED.indexOf(this.status) > -1) return '可维护'
-        if (PENDING.indexOf(this.status) > -1) return '审核中'
+        if (chefStatus.isChefWorkbenchAvailable(this.chef)) return '可维护'
+        if (chefStatus.isChefPending(this.chef)) return '审核中'
         return '受限'
       },
       chipTone() {
         return this.statusTone
       },
       statusTone() {
-        if (ACTIVE.indexOf(this.status) > -1 || PAUSED.indexOf(this.status) > -1) return 'ok'
-        if (PENDING.indexOf(this.status) > -1) return 'warn'
+        if (chefStatus.isChefWorkbenchAvailable(this.chef)) return 'ok'
+        if (chefStatus.isChefPending(this.chef)) return 'warn'
         if (this.isRejected) return 'danger'
+        if (chefStatus.isChefDisabled(this.chef) || chefStatus.isChefResigned(this.chef)) return 'danger'
         return 'muted'
       },
       submitText() {
@@ -171,6 +250,13 @@
       },
       canAddWorkImage() {
         return this.workImageList.length < this.maxWorkImages
+      },
+      canManageTime() {
+        return !!(this.chef && (this.chef.chefId || this.chef.id))
+      },
+      timeStatusIndex() {
+        const index = this.timeStatusOptions.findIndex(item => item.value === this.timeForm.status)
+        return index > -1 ? index : 0
       }
     },
     onShow() {
@@ -181,15 +267,33 @@
         getChefMy().then(res => {
           this.chef = this.unwrap(res) || {}
           this.fill(this.chef)
+          if (this.canManageTime) {
+            this.loadChefTimes()
+          } else {
+            this.chefTimes = []
+          }
         }).catch(() => {
           this.chef = {}
+          this.chefTimes = []
+        })
+      },
+      loadChefTimes() {
+        this.timeLoading = true
+        return getChefTime({}).then(res => {
+          this.chefTimes = this.toTimeList(res)
+        }).catch(() => {
+          this.chefTimes = []
+        }).finally(() => {
+          this.timeLoading = false
         })
       },
       unwrap(res) {
         return res && res.data !== undefined ? res.data : res
       },
-      normalize(value) {
-        return String(value || '').trim().toUpperCase()
+      toTimeList(res) {
+        const data = this.unwrap(res)
+        const list = Array.isArray(data) ? data : (data && Array.isArray(data.rows) ? data.rows : [])
+        return list.slice().sort((a, b) => String(a.startTime || '').localeCompare(String(b.startTime || '')))
       },
       stringify(value) {
         if (Array.isArray(value)) return value.join('、')
@@ -205,6 +309,20 @@
       formatDate(value) {
         if (!value) return ''
         return String(value).slice(0, 10)
+      },
+      formatTime(value) {
+        if (!value) return ''
+        const text = String(value).replace('T', ' ')
+        const parts = text.split(' ')
+        return parts.length > 1 ? parts[1].slice(0, 5) : text.slice(0, 5)
+      },
+      formatTimeRange(item) {
+        const start = item.startTime || ''
+        const end = item.endTime || ''
+        return `${this.formatDate(start)} ${this.formatTime(start)}-${this.formatTime(end)}`
+      },
+      timeStatusText(status) {
+        return status === '1' ? '停用' : '启用'
       },
       fill(data) {
         this.form.realName = data.realName || data.name || data.chefName || ''
@@ -222,6 +340,19 @@
       },
       onDateChange(e) {
         this.form.healthCertificateExpireDate = e.detail.value
+      },
+      onTimeDateChange(e) {
+        this.timeForm.date = e.detail.value
+      },
+      onStartTimeChange(e) {
+        this.timeForm.startTime = e.detail.value
+      },
+      onEndTimeChange(e) {
+        this.timeForm.endTime = e.detail.value
+      },
+      onTimeStatusChange(e) {
+        const index = Number(e.detail.value || 0)
+        this.timeForm.status = this.timeStatusOptions[index].value
       },
       onRegionChange(e) {
         const value = e.detail.value || []
@@ -364,6 +495,69 @@
         this.serviceAreaList.splice(index, 1)
         this.syncServiceAreas()
       },
+      resetTimeForm() {
+        this.timeForm = {
+          timeId: null,
+          date: '',
+          startTime: '',
+          endTime: '',
+          status: '0',
+          remark: ''
+        }
+      },
+      editTime(item) {
+        this.timeForm = {
+          timeId: item.timeId,
+          date: this.formatDate(item.startTime),
+          startTime: this.formatTime(item.startTime),
+          endTime: this.formatTime(item.endTime),
+          status: item.status || '0',
+          remark: item.remark || ''
+        }
+      },
+      buildTimePayload() {
+        return {
+          timeId: this.timeForm.timeId,
+          startTime: `${this.timeForm.date} ${this.timeForm.startTime}:00`,
+          endTime: `${this.timeForm.date} ${this.timeForm.endTime}:00`,
+          status: this.timeForm.status,
+          remark: this.timeForm.remark
+        }
+      },
+      validateTime() {
+        if (!this.timeForm.date) return '请选择日期'
+        if (!this.timeForm.startTime) return '请选择开始时间'
+        if (!this.timeForm.endTime) return '请选择结束时间'
+        const start = new Date(`${this.timeForm.date.replace(/-/g, '/')} ${this.timeForm.startTime}:00`)
+        const end = new Date(`${this.timeForm.date.replace(/-/g, '/')} ${this.timeForm.endTime}:00`)
+        if (!start.getTime() || !end.getTime()) return '请选择有效时间'
+        if (end.getTime() <= start.getTime()) return '结束时间必须晚于开始时间'
+        return ''
+      },
+      saveTime() {
+        const message = this.validateTime()
+        if (message) {
+          this.$modal.showToast(message)
+          return
+        }
+        const action = this.timeForm.timeId ? updateChefTime : addChefTime
+        this.timeSubmitting = true
+        action(this.buildTimePayload()).then(() => {
+          this.$modal.msgSuccess(this.timeForm.timeId ? '时间段已保存' : '时间段已添加')
+          this.resetTimeForm()
+          this.loadChefTimes()
+        }).finally(() => {
+          this.timeSubmitting = false
+        })
+      },
+      removeTime(item) {
+        this.$modal.confirm('确认删除该可预约时间段吗？').then(() => {
+          return deleteChefTime(item.timeId)
+        }).then(() => {
+          this.$modal.msgSuccess('时间段已删除')
+          this.loadChefTimes()
+        })
+      },
       syncServiceAreas() {
         this.form.serviceArea = this.serviceAreaList.join('、')
       },
@@ -438,6 +632,7 @@
 
   .head-card,
   .warn-card,
+  .time-card,
   .form-card {
     border-radius: 14rpx;
     background: #fff;
@@ -508,6 +703,133 @@
   .form-card {
     margin-top: 22rpx;
     padding: 8rpx 26rpx 28rpx;
+  }
+
+  .time-card {
+    margin-top: 22rpx;
+    padding: 26rpx;
+  }
+
+  .section-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 20rpx;
+  }
+
+  .section-title {
+    color: #17211b;
+    font-size: 30rpx;
+    font-weight: 700;
+  }
+
+  .section-desc {
+    margin-top: 8rpx;
+    color: #7b8780;
+    font-size: 24rpx;
+    line-height: 1.45;
+  }
+
+  .small-btn {
+    flex: 0 0 auto;
+    margin: 0;
+    padding: 0 22rpx;
+    border-radius: 8rpx;
+    background: #ecf7ef;
+    color: #2f8f55;
+    font-size: 24rpx;
+  }
+
+  .time-list {
+    margin-top: 22rpx;
+    border-top: 1rpx solid #edf0ee;
+  }
+
+  .time-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18rpx;
+    padding: 20rpx 0;
+    border-bottom: 1rpx solid #edf0ee;
+  }
+
+  .time-info {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .time-range,
+  .time-remark {
+    display: block;
+  }
+
+  .time-range {
+    color: #17211b;
+    font-size: 27rpx;
+    line-height: 1.4;
+  }
+
+  .time-status {
+    display: inline-block;
+    margin-top: 8rpx;
+    padding: 4rpx 10rpx;
+    border-radius: 6rpx;
+    font-size: 22rpx;
+    line-height: 1.2;
+  }
+
+  .time-status.on {
+    background: #dcf4e1;
+    color: #176c35;
+  }
+
+  .time-status.off {
+    background: #edf0ee;
+    color: #647068;
+  }
+
+  .time-remark {
+    margin-top: 8rpx;
+    color: #7b8780;
+    font-size: 24rpx;
+    line-height: 1.4;
+  }
+
+  .time-actions {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 18rpx;
+  }
+
+  .text-action {
+    color: #2f8f55;
+    font-size: 25rpx;
+  }
+
+  .text-action.danger {
+    color: #a82819;
+  }
+
+  .empty-time {
+    margin-top: 22rpx;
+    padding: 22rpx;
+    border-radius: 8rpx;
+    background: #fbfcfb;
+    color: #7b8780;
+    font-size: 25rpx;
+    text-align: center;
+  }
+
+  .time-form {
+    margin-top: 10rpx;
+  }
+
+  .time-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18rpx;
   }
 
   .field {
@@ -658,5 +980,16 @@
     background: #2f8f55;
     color: #fff;
     font-size: 30rpx;
+  }
+
+  .time-submit {
+    margin-top: 26rpx;
+    width: 100%;
+    height: 78rpx;
+    line-height: 78rpx;
+    border-radius: 8rpx;
+    background: #2f8f55;
+    color: #fff;
+    font-size: 28rpx;
   }
 </style>

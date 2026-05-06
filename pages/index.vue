@@ -3,20 +3,30 @@
     <view class="hero">
       <view class="hero-top">
         <view>
-          <view class="eyebrow">上门做饭</view>
           <view class="title">把一餐家常饭交给可靠的人</view>
         </view>
-        <button class="ghost-btn" @click="goOrders">订单</button>
       </view>
-      <view class="search-panel">
+      <view v-if="showChefRecommendations" class="search-panel">
         <view class="search-row">
           <uni-icons type="search" size="18" color="#f06a3a"></uni-icons>
           <input v-model="query.keyword" confirm-type="search" placeholder="搜索姓名、菜系、区域" @confirm="loadChefs" />
         </view>
         <view class="filter-row">
-          <picker class="region-picker" mode="region" :value="regionValue" @change="onRegionChange">
-            <view class="region-value" :class="{ placeholder: !query.serviceArea }">
-              {{ serviceAreaLabel || query.serviceArea || '选择服务区域' }}
+          <picker
+            class="region-picker"
+            mode="multiSelector"
+            :value="regionIndex"
+            :range="regionColumns"
+            @click="onRegionPickerTap"
+            @columnchange="onRegionColumnChange"
+            @change="onRegionChange"
+            @cancel="onRegionCancel"
+          >
+            <view class="region-select" @tap="onRegionPickerTap">
+              <text class="region-value" :class="{ placeholder: !query.serviceArea }">
+                {{ serviceAreaLabel || query.serviceArea || '选择服务区域' }}
+              </text>
+              <uni-icons :type="regionPickerOpen ? 'top' : 'bottom'" size="14" color="#8a8f98"></uni-icons>
             </view>
           </picker>
           <button @click="loadChefs">筛选</button>
@@ -25,7 +35,7 @@
     </view>
 
     <view class="quick-actions">
-      <view class="quick-item" @click="goAddress">
+      <view v-if="!isCurrentChef" class="quick-item" @click="goAddress">
         <uni-icons type="location-filled" size="24" color="#f06a3a"></uni-icons>
         <text>地址管理</text>
       </view>
@@ -33,23 +43,20 @@
         <uni-icons type="calendar-filled" size="24" color="#20a779"></uni-icons>
         <text>我的订单</text>
       </view>
-      <view class="quick-item" @click="loadChefs">
+      <view v-if="showChefRecommendations" class="quick-item" @click="loadChefs">
         <uni-icons type="refresh" size="24" color="#2f7d58"></uni-icons>
         <text>刷新推荐</text>
       </view>
     </view>
 
-    <view class="section-head">
-      <view>
-        <text class="section-title">推荐做饭人员</text>
-        <text class="section-subtitle">可先浏览，提交预约前再登录</text>
-      </view>
+    <view v-if="showChefRecommendations" class="section-head">
+      <text class="section-title">推荐做饭人员</text>
     </view>
 
-    <view v-if="loading" class="state-box">正在寻找合适的做饭人员...</view>
-    <view v-else-if="chefs.length === 0" class="state-box">暂无可预约人员，可更换区域后再试</view>
+    <view v-if="showChefRecommendations && loading" class="state-box">正在寻找合适的做饭人员...</view>
+    <view v-else-if="showChefRecommendations && chefs.length === 0" class="state-box">暂无可预约人员，可更换区域后再试</view>
 
-    <view v-else class="chef-list">
+    <view v-else-if="showChefRecommendations" class="chef-list">
       <view v-for="chef in chefs" :key="chef.id" class="chef-card" @click="openChef(chef)">
         <image class="avatar" :src="chef.avatar" mode="aspectFill"></image>
         <view class="chef-main">
@@ -77,6 +84,9 @@
 <script>
   import { getToken } from '@/utils/auth'
   import { listChefs } from '@/api/cooking/user'
+  import { getChefMy } from '@/api/cooking/chef'
+  import regionData from '@/utils/region-data'
+  const chefStatus = require('@/utils/chef-status')
 
   const defaultAvatar = '/static/images/profile.jpg'
 
@@ -90,14 +100,46 @@
         },
         serviceAreaLabel: '',
         regionValue: [],
+        regionIndex: [0, 0, 0],
+        regionColumns: [[], [], []],
+        regionPickerOpen: false,
+        chefProfile: {},
         chefs: []
       }
     },
+    computed: {
+      isCurrentChef() {
+        return chefStatus.isChefWorkbenchAvailable(this.chefProfile)
+      },
+      showChefRecommendations() {
+        return chefStatus.shouldShowChefRecommendations(this.chefProfile)
+      }
+    },
     onLoad() {
-      this.loadChefs()
+      this.initRegionPicker()
+      this.loadPage()
     },
     methods: {
+      loadPage() {
+        return this.loadCurrentChef().finally(() => this.loadChefs())
+      },
+      loadCurrentChef() {
+        if (!getToken()) {
+          this.chefProfile = {}
+          return Promise.resolve()
+        }
+        return getChefMy().then(res => {
+          this.chefProfile = this.unwrap(res) || {}
+        }).catch(() => {
+          this.chefProfile = {}
+        })
+      },
       loadChefs() {
+        if (!this.showChefRecommendations) {
+          this.chefs = []
+          this.loading = false
+          return Promise.resolve()
+        }
         this.loading = true
         listChefs({
           keyword: this.query.keyword,
@@ -110,12 +152,82 @@
           this.loading = false
         })
       },
+      unwrap(res) {
+        if (!res) return null
+        if (res.data !== undefined) return res.data
+        return res
+      },
+      initRegionPicker() {
+        this.regionColumns = this.buildRegionColumns(this.regionIndex)
+      },
+      onRegionPickerTap() {
+        this.regionPickerOpen = true
+      },
+      onRegionCancel() {
+        this.regionPickerOpen = false
+      },
+      onRegionColumnChange(event) {
+        const detail = event.detail || {}
+        const nextIndex = this.regionIndex.slice()
+        nextIndex[detail.column] = detail.value
+        if (detail.column === 0) {
+          nextIndex[1] = 0
+          nextIndex[2] = 0
+        }
+        if (detail.column === 1) {
+          nextIndex[2] = 0
+        }
+        this.regionIndex = this.normalizeRegionIndex(nextIndex)
+        this.regionColumns = this.buildRegionColumns(this.regionIndex)
+      },
       onRegionChange(event) {
-        const region = event.detail && event.detail.value ? event.detail.value : []
+        this.regionPickerOpen = false
+        this.regionIndex = this.normalizeRegionIndex(event.detail && event.detail.value ? event.detail.value : this.regionIndex)
+        this.regionColumns = this.buildRegionColumns(this.regionIndex)
+        const region = this.getRegionNames(this.regionIndex)
         this.regionValue = region
         this.serviceAreaLabel = region.filter(Boolean).join(' ')
         this.query.serviceArea = region[2] || region[1] || region[0] || ''
         this.loadChefs()
+      },
+      buildRegionColumns(index) {
+        const province = regionData[index[0]] || regionData[0]
+        const cities = this.getChildren(province)
+        const city = cities[index[1]] || cities[0]
+        const districts = this.getChildren(city)
+        return [
+          regionData.map(item => item.name),
+          cities.map(item => item.name),
+          districts.map(item => typeof item === 'string' ? item : item.name)
+        ]
+      },
+      getRegionNames(index) {
+        const province = regionData[index[0]] || regionData[0]
+        const cities = this.getChildren(province)
+        const city = cities[index[1]] || cities[0]
+        const districts = this.getChildren(city)
+        const district = districts[index[2]] || districts[0]
+        return [
+          province && province.name,
+          city && city.name,
+          typeof district === 'string' ? district : district && district.name
+        ].filter(Boolean)
+      },
+      getChildren(item) {
+        return item && Array.isArray(item.children) ? item.children : []
+      },
+      normalizeRegionIndex(value) {
+        const nextIndex = (Array.isArray(value) ? value : []).map(item => Number(item) || 0)
+        const provinceIndex = this.clampIndex(nextIndex[0], regionData.length)
+        const cities = this.getChildren(regionData[provinceIndex])
+        const cityIndex = this.clampIndex(nextIndex[1], cities.length)
+        const districts = this.getChildren(cities[cityIndex])
+        const districtIndex = this.clampIndex(nextIndex[2], districts.length)
+        return [provinceIndex, cityIndex, districtIndex]
+      },
+      clampIndex(index, length) {
+        if (!length || index < 0) return 0
+        return index >= length ? length - 1 : index
       },
       pickList(res) {
         if (Array.isArray(res)) return res
@@ -166,7 +278,7 @@
         this.requireLogin('/pages/user/address')
       },
       goOrders() {
-        this.requireLogin('/pages/user/orders')
+        this.requireLogin(chefStatus.resolveOrderPage(this.chefProfile))
       }
     }
   }
@@ -196,28 +308,11 @@
     gap: 24rpx;
   }
 
-  .eyebrow {
-    font-size: 24rpx;
-    opacity: .9;
-    margin-bottom: 10rpx;
-  }
-
   .title {
     max-width: 520rpx;
     font-size: 44rpx;
     line-height: 1.25;
     font-weight: 700;
-  }
-
-  .ghost-btn {
-    width: 112rpx;
-    height: 58rpx;
-    line-height: 58rpx;
-    padding: 0;
-    border-radius: 8rpx;
-    color: #fff;
-    font-size: 26rpx;
-    background: rgba(255, 255, 255, .18);
   }
 
   .search-panel {
@@ -256,9 +351,17 @@
     flex: 1;
   }
 
-  .region-value {
+  .region-select {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
     height: 54rpx;
-    line-height: 54rpx;
+    gap: 12rpx;
+  }
+
+  .region-value {
+    min-width: 0;
+    flex: 1;
     color: #26332e;
     font-size: 28rpx;
     overflow: hidden;
@@ -303,6 +406,7 @@
 
   .section-head {
     padding: 28rpx 32rpx 12rpx;
+    text-align: center;
   }
 
   .section-title {
@@ -310,13 +414,6 @@
     color: #1d2b26;
     font-size: 34rpx;
     font-weight: 700;
-  }
-
-  .section-subtitle {
-    display: block;
-    margin-top: 8rpx;
-    color: #7b8580;
-    font-size: 24rpx;
   }
 
   .state-box {

@@ -3,7 +3,6 @@
     <view class="top-card">
       <view class="top-row">
         <view>
-          <text class="eyebrow">做饭人员工作台</text>
           <view class="title-row">
             <text class="chef-name">{{ chefName }}</text>
             <text :class="['status-pill', statusTone]">{{ auditStatusText }}</text>
@@ -12,7 +11,7 @@
         <image class="avatar" :src="chefAvatar" mode="aspectFill"></image>
       </view>
 
-      <view class="notice-bar">
+      <view v-if="isChefWorkbenchAvailable" class="notice-bar">
         <text class="notice-icon">公告</text>
         <swiper v-if="announcements.length" class="notice-swiper" vertical autoplay circular interval="3500">
           <swiper-item v-for="(item, index) in announcements" :key="index">
@@ -22,28 +21,16 @@
         <view v-else class="notice-text">暂无抽佣调整公告</view>
       </view>
 
-      <view class="state-panel">
-        <view>
-          <text class="state-label">接单状态</text>
-          <view class="state-value">{{ takingStatusText }}</view>
-        </view>
-        <view class="state-actions">
-          <button v-if="canPause" class="mini-btn" size="mini" @click="handlePause">暂停接单</button>
-          <button v-if="canResume" class="mini-btn primary" size="mini" @click="handleResume">恢复接单</button>
-        </view>
-      </view>
     </view>
 
     <view v-if="needApply" class="empty-card">
-      <view class="empty-title">还没有做饭人员身份</view>
-      <view class="empty-desc">提交入驻资料后，审核通过即可维护时间并接收预约。</view>
       <button class="primary-btn" @click="goProfile">申请入驻</button>
     </view>
 
-    <view v-else class="summary-grid">
+    <view v-if="isChefWorkbenchAvailable" class="summary-grid">
       <view class="summary-card">
         <text class="summary-number">{{ summary.waitResponse }}</text>
-        <text class="summary-label">待响应</text>
+        <text class="summary-label">待接单报价</text>
       </view>
       <view class="summary-card">
         <text class="summary-number">{{ summary.todayService }}</text>
@@ -59,8 +46,7 @@
       </view>
     </view>
 
-    <view class="quick-section">
-      <view class="section-title">主链路</view>
+    <view v-if="isChefWorkbenchAvailable" class="quick-section">
       <view class="quick-list">
         <view class="quick-item" @click="goProfile">
           <view class="quick-icon dark">档</view>
@@ -98,19 +84,11 @@
 <script>
   import {
     getChefMy,
-    pauseChef,
-    resumeChef,
     resignChef,
     getChefOrderList,
     getCommissionAnnouncement
   } from '@/api/cooking/chef'
-
-  const ACTIVE_STATUS = ['APPROVED', 'AUDIT_PASS', 'PASSED', 'NORMAL', 'ENABLED']
-  const PAUSED_STATUS = ['PAUSED', 'PAUSE', 'SUSPENDED', 'STOP_TAKING']
-  const PENDING_STATUS = ['PENDING', 'WAIT_AUDIT', 'AUDITING', 'APPLYING']
-  const REJECTED_STATUS = ['REJECTED', 'AUDIT_REJECTED', 'REFUSED']
-  const DISABLED_STATUS = ['DISABLED', 'BANNED', 'FORBIDDEN']
-  const RESIGNED_STATUS = ['RESIGNED', 'QUIT', 'LEFT']
+  const chefStatus = require('@/utils/chef-status')
 
   export default {
     data() {
@@ -122,9 +100,6 @@
       }
     },
     computed: {
-      chefStatus() {
-        return this.normalizeStatus(this.chef.status || this.chef.auditStatus || this.chef.chefStatus || this.chef.identityStatus)
-      },
       chefName() {
         return this.chef.realName || this.chef.name || this.chef.nickName || this.$store.state.user.name || '做饭人员'
       },
@@ -132,39 +107,28 @@
         return this.chef.avatarUrl || this.chef.avatar || this.$store.state.user.avatar || '/static/images/profile.jpg'
       },
       needApply() {
-        return !this.chef.id && !this.chef.chefId && !this.chefStatus
+        return chefStatus.needChefApply(this.chef)
+      },
+      isChefWorkbenchAvailable() {
+        return chefStatus.isChefWorkbenchAvailable(this.chef)
       },
       auditStatusText() {
-        const status = this.chefStatus
-        if (ACTIVE_STATUS.indexOf(status) > -1) return '审核通过'
-        if (PAUSED_STATUS.indexOf(status) > -1) return '暂停接单'
-        if (PENDING_STATUS.indexOf(status) > -1) return '待审核'
-        if (REJECTED_STATUS.indexOf(status) > -1) return '审核驳回'
-        if (DISABLED_STATUS.indexOf(status) > -1) return '已禁用'
-        if (RESIGNED_STATUS.indexOf(status) > -1) return '已离职'
+        if (chefStatus.isChefApproved(this.chef) && chefStatus.isChefPaused(this.chef)) return '暂停接单'
+        if (chefStatus.isChefApproved(this.chef) && chefStatus.isChefNormal(this.chef)) return '审核通过'
+        if (chefStatus.isChefPending(this.chef)) return '待审核'
+        if (chefStatus.isChefRejected(this.chef)) return '审核驳回'
+        if (chefStatus.isChefDisabled(this.chef)) return '已禁用'
+        if (chefStatus.isChefResigned(this.chef)) return '已离职'
         return this.needApply ? '未申请' : (this.chef.statusName || '资料待完善')
       },
       statusTone() {
-        const status = this.chefStatus
-        if (ACTIVE_STATUS.indexOf(status) > -1) return 'ok'
-        if (PAUSED_STATUS.indexOf(status) > -1 || PENDING_STATUS.indexOf(status) > -1) return 'warn'
-        if (REJECTED_STATUS.indexOf(status) > -1 || DISABLED_STATUS.indexOf(status) > -1 || RESIGNED_STATUS.indexOf(status) > -1) return 'danger'
+        if (chefStatus.isChefApproved(this.chef) && chefStatus.isChefNormal(this.chef)) return 'ok'
+        if (chefStatus.isChefPaused(this.chef) || chefStatus.isChefPending(this.chef)) return 'warn'
+        if (chefStatus.isChefRejected(this.chef) || chefStatus.isChefDisabled(this.chef) || chefStatus.isChefResigned(this.chef)) return 'danger'
         return 'muted'
       },
-      takingStatusText() {
-        if (ACTIVE_STATUS.indexOf(this.chefStatus) > -1) return '可接单'
-        if (PAUSED_STATUS.indexOf(this.chefStatus) > -1) return '暂停中'
-        if (this.needApply) return '未开通'
-        return '暂不可接单'
-      },
-      canPause() {
-        return ACTIVE_STATUS.indexOf(this.chefStatus) > -1
-      },
-      canResume() {
-        return PAUSED_STATUS.indexOf(this.chefStatus) > -1
-      },
       canResign() {
-        return ACTIVE_STATUS.indexOf(this.chefStatus) > -1 || PAUSED_STATUS.indexOf(this.chefStatus) > -1
+        return this.isChefWorkbenchAvailable
       },
       summary() {
         const now = new Date()
@@ -198,7 +162,14 @@
     methods: {
       loadPage() {
         this.loading = true
-        Promise.all([this.loadChef(), this.loadOrders(), this.loadAnnouncements()]).finally(() => {
+        this.loadChef().then(() => {
+          if (this.isChefWorkbenchAvailable) {
+            return Promise.all([this.loadOrders(), this.loadAnnouncements()])
+          }
+          this.orders = []
+          this.announcements = []
+          return null
+        }).finally(() => {
           this.loading = false
         })
       },
@@ -276,22 +247,6 @@
       goSettlement() {
         this.$tab.navigateTo('/pages/work/settlement')
       },
-      handlePause() {
-        this.$modal.confirm('暂停前需先完成手上全部未完成订单，确认暂停接单吗？').then(() => {
-          pauseChef({}).then(() => {
-            this.$modal.msgSuccess('已提交暂停接单')
-            this.loadChef()
-          })
-        })
-      },
-      handleResume() {
-        this.$modal.confirm('确认恢复接单吗？').then(() => {
-          resumeChef({}).then(() => {
-            this.$modal.msgSuccess('已恢复接单')
-            this.loadChef()
-          })
-        })
-      },
       handleResign() {
         this.$modal.confirm('离职申请提交后将由平台处理，未完成订单会被拦截，确认提交吗？').then(() => {
           resignChef({}).then(() => {
@@ -325,23 +280,13 @@
 
   .top-row,
   .title-row,
-  .state-panel,
-  .state-actions,
   .quick-item {
     display: flex;
     align-items: center;
   }
 
-  .top-row,
-  .state-panel {
+  .top-row {
     justify-content: space-between;
-  }
-
-  .eyebrow {
-    display: block;
-    color: rgba(255, 255, 255, 0.68);
-    font-size: 24rpx;
-    margin-bottom: 12rpx;
   }
 
   .chef-name {
@@ -422,33 +367,6 @@
     white-space: nowrap;
   }
 
-  .state-panel {
-    margin-top: 28rpx;
-    padding-top: 24rpx;
-    border-top: 1rpx solid rgba(255, 255, 255, 0.14);
-  }
-
-  .state-label {
-    display: block;
-    color: rgba(255, 255, 255, 0.62);
-    font-size: 22rpx;
-  }
-
-  .state-value {
-    margin-top: 6rpx;
-    font-size: 30rpx;
-    font-weight: 600;
-  }
-
-  .mini-btn {
-    margin-left: 16rpx;
-    border: 1rpx solid rgba(255, 255, 255, 0.38);
-    background: transparent;
-    color: #fff;
-    font-size: 24rpx;
-  }
-
-  .mini-btn.primary,
   .primary-btn {
     border-color: #2f8f55;
     background: #2f8f55;

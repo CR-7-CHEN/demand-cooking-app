@@ -96,6 +96,11 @@
       "navigationBarTitleText": "常见问题"
     }
   }, {
+    "path": "pages/mine/service/index",
+    "style": {
+      "navigationBarTitleText": "在线客服"
+    }
+  }, {
     "path": "pages/mine/about/index",
     "style": {
       "navigationBarTitleText": "关于我们"

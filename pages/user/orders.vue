@@ -1,10 +1,6 @@
 <template>
   <view class="page">
     <view class="header">
-      <view>
-        <view class="title">我的订单</view>
-        <view class="subtitle">查看预约、报价、支付和完成进度</view>
-      </view>
       <button class="refresh-btn" @click="loadOrders">刷新</button>
     </view>
 
@@ -43,31 +39,50 @@
 
 <script>
   import { listMyOrders } from '@/api/cooking/user'
+  import { getChefMy } from '@/api/cooking/chef'
+  import { getToken } from '@/utils/auth'
+  const chefStatus = require('@/utils/chef-status')
+  const orderTabs = require('@/utils/user-order-tabs')
 
   export default {
     data() {
       return {
         loading: false,
-        activeStatus: '',
-        tabs: [
-          { label: '全部', value: '' },
-          { label: '待响应', value: 'WAITING_RESPONSE' },
-          { label: '待支付', value: 'WAITING_PAY' },
-          { label: '待服务', value: 'WAITING_SERVICE' },
-          { label: '待确认', value: 'WAITING_CONFIRM' },
-          { label: '已完成', value: 'COMPLETED' }
-        ],
+        activeStatus: orderTabs.USER_ORDER_TABS[0].value,
+        tabs: orderTabs.USER_ORDER_TABS,
+        chefProfile: {},
         orders: []
       }
     },
     onShow() {
-      this.loadOrders()
+      this.enterPage()
     },
     methods: {
+      enterPage() {
+        return this.loadCurrentChef().then(() => {
+          const orderPage = chefStatus.resolveOrderPage(this.chefProfile)
+          if (orderPage !== '/pages/user/orders') {
+            this.$tab.redirectTo(orderPage)
+            return null
+          }
+          return this.loadOrders()
+        })
+      },
+      loadCurrentChef() {
+        if (!getToken()) {
+          this.chefProfile = {}
+          return Promise.resolve()
+        }
+        return getChefMy().then(res => {
+          this.chefProfile = this.unwrap(res) || {}
+        }).catch(() => {
+          this.chefProfile = {}
+        })
+      },
       loadOrders() {
         this.loading = true
         listMyOrders({
-          status: this.activeStatus
+          statusGroup: this.activeStatus
         }).then(res => {
           this.orders = this.pickList(res).map(this.normalizeOrder)
         }).catch(() => {
@@ -77,6 +92,7 @@
         })
       },
       pickList(res) {
+        const data = this.unwrap(res)
         if (Array.isArray(res)) return res
         if (Array.isArray(res.rows)) return res.rows
         if (Array.isArray(res.records)) return res.records
@@ -84,7 +100,13 @@
         if (res.data && Array.isArray(res.data.rows)) return res.data.rows
         if (res.data && Array.isArray(res.data.records)) return res.data.records
         if (res.data && Array.isArray(res.data.list)) return res.data.list
+        if (Array.isArray(data)) return data
         return []
+      },
+      unwrap(res) {
+        if (!res) return null
+        if (res.data !== undefined) return res.data
+        return res
       },
       normalizeOrder(item) {
         return {
@@ -93,6 +115,9 @@
           startTime: item.startTime || item.appointmentStartTime || item.serviceStartTime,
           price: item.price || item.totalPrice || item.quoteAmount
         }
+      },
+      normalizeStatus(status) {
+        return orderTabs.normalizeStatus(status)
       },
       chefDisplayName(order) {
         return order.chefName || (order.chef && order.chef.name) || '待确认'
@@ -112,8 +137,11 @@
         const map = {
           WAITING_RESPONSE: '待响应',
           REJECTED_CLOSED: '已拒绝',
+          RESPONSE_TIMEOUT_CLOSED: '响应超时关闭',
           WAITING_PAY: '待支付',
           PRICE_OBJECTION: '异议中',
+          OBJECTION_TIMEOUT_CLOSED: '异议超时关闭',
+          PAY_TIMEOUT_CLOSED: '支付超时关闭',
           WAITING_SERVICE: '待服务',
           WAITING_CONFIRM: '待确认',
           COMPLETED: '已完成',
@@ -147,16 +175,8 @@
     justify-content: space-between;
   }
 
-  .title {
-    color: #1d2b26;
-    font-size: 38rpx;
-    font-weight: 700;
-  }
-
-  .subtitle {
-    margin-top: 8rpx;
-    color: #7b8580;
-    font-size: 24rpx;
+  .header {
+    justify-content: flex-end;
   }
 
   .refresh-btn {

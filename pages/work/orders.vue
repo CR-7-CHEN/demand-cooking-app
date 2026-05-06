@@ -55,7 +55,7 @@
           label: '全部',
           value: 'all'
         }, {
-          label: '待响应',
+          label: '待接单报价',
           value: 'response'
         }, {
           label: '异议',
@@ -108,7 +108,7 @@
       },
       tabOf(order) {
         const status = this.normalize(order.status || order.orderStatus)
-        if (['WAIT_CHEF_RESPONSE', 'PENDING_RESPONSE', 'WAIT_RESPONSE'].indexOf(status) > -1) return 'response'
+        if (['WAITING_RESPONSE', 'WAIT_CHEF_RESPONSE', 'PENDING_RESPONSE', 'WAIT_RESPONSE'].indexOf(status) > -1) return 'response'
         if (['QUOTE_DISPUTE', 'QUOTE_OBJECTION', 'DISPUTE'].indexOf(status) > -1) return 'dispute'
         if (['WAIT_SERVICE', 'PENDING_SERVICE'].indexOf(status) > -1) return 'service'
         if (['WAIT_USER_CONFIRM', 'PENDING_CONFIRM', 'WAIT_CONFIRM'].indexOf(status) > -1) return 'confirm'
@@ -117,7 +117,7 @@
       },
       statusText(order) {
         const map = {
-          response: '待响应',
+          response: '待接单报价',
           dispute: '报价异议',
           service: '待服务',
           confirm: '待确认',

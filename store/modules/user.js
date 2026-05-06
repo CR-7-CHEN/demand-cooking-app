@@ -2,7 +2,7 @@ import config from '@/config'
 import storage from '@/utils/storage'
 import constant from '@/utils/constant'
 import { isHttp, isEmpty } from "@/utils/validate"
-import { login, wxLogin, logout, getInfo } from '@/api/login'
+import { login, wxLogin, register, logout, getInfo } from '@/api/login'
 import { getToken, setToken, removeToken, getClientId, setClientId, removeClientId } from '@/utils/auth'
 import defAva from '@/static/images/profile.jpg'
 
@@ -83,6 +83,28 @@ const user = {
             return
           }
           const clientId = data.client_id || data.clientId || config.xcxClientId || config.clientId
+          setToken(token)
+          setClientId(clientId)
+          commit('SET_TOKEN', token)
+          commit('SET_CLIENT_ID', clientId)
+          resolve()
+        }).catch(error => {
+          reject(error)
+        })
+      })
+    },
+
+    // 注册并保存登录态
+    Register({ commit }, userInfo) {
+      return new Promise((resolve, reject) => {
+        register(userInfo).then(res => {
+          const data = res.data || res
+          const token = data.access_token || data.accessToken || data.token
+          if (!token) {
+            reject(new Error('注册成功但未返回登录凭证'))
+            return
+          }
+          const clientId = data.client_id || data.clientId || config.passwordClientId || config.clientId
           setToken(token)
           setClientId(clientId)
           commit('SET_TOKEN', token)

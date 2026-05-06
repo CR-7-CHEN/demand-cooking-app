@@ -270,7 +270,7 @@
         return /[￥元]/.test(text) ? text : `￥${text}`
       },
       normalizeAddress(item) {
-        const region = item.region || item.area || item.district || ''
+        const region = item.region || item.areaName || item.area || item.district || ''
         const detail = item.detailAddress || item.address || item.detail || ''
         const house = item.houseNumber || item.doorNo || item.houseNo || ''
         return {
@@ -315,6 +315,29 @@
       },
       changeDishes(e) {
         this.selectedDishIds = e.detail.value || []
+      },
+      buildDishSnapshot(selectedDishes) {
+        const customDishNames = String(this.form.customDish || '')
+          .split(/[,;\n，；、]+/)
+          .map(item => item.trim())
+          .filter(Boolean)
+        return JSON.stringify({
+          dishes: selectedDishes.map(item => ({
+            id: item.id,
+            name: item.name,
+            category: item.category,
+            cuisine: item.cuisine
+          })),
+          customDishNames,
+          tasteRemark: String(this.form.tasteRemark || '').trim(),
+          materialRemark: String(this.form.materialRemark || '').trim()
+        })
+      },
+      buildUserRemark() {
+        return [
+          String(this.form.tasteRemark || '').trim(),
+          String(this.form.materialRemark || '').trim()
+        ].filter(Boolean).join('\n')
       },
       formatDate(date) {
         const month = String(date.getMonth() + 1).padStart(2, '0')
@@ -363,14 +386,14 @@
         const payload = {
           chefId: this.chef.id || this.chefId,
           addressId: this.selectedAddress.id,
-          appointmentStartTime: startTime,
-          appointmentEndTime: endTime,
-          dishIds: selectedDishes.map(item => item.id),
-          dishes: selectedDishes,
-          customDishNames: this.form.customDish,
-          tasteRemark: this.form.tasteRemark,
-          materialRemark: this.form.materialRemark,
-          addressSnapshot: this.selectedAddress
+          contactName: this.selectedAddress.contactName,
+          contactPhone: this.selectedAddress.phone,
+          serviceArea: this.selectedAddress.region,
+          addressSnapshot: this.selectedAddress.fullAddress,
+          serviceStartTime: startTime,
+          serviceEndTime: endTime,
+          dishSnapshot: this.buildDishSnapshot(selectedDishes),
+          userRemark: this.buildUserRemark()
         }
         this.submitting = true
         submitOrder(payload).then(res => {

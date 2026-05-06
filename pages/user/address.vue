@@ -1,13 +1,5 @@
 <template>
   <view class="page">
-    <view class="top">
-      <view>
-        <view class="title">常用地址</view>
-        <view class="subtitle">提交预约时会保存地址快照</view>
-      </view>
-      <button class="add-btn" @click="startAdd">新增</button>
-    </view>
-
     <view v-if="loading" class="state">地址加载中...</view>
     <view v-else-if="addresses.length === 0" class="state">还没有地址，先新增一个上门地址</view>
     <view v-else class="list">
@@ -60,7 +52,7 @@
       </view>
       <view class="switch-row">
         <text>设为默认地址</text>
-        <switch :checked="form.isDefault" color="#f06a3a" @change="changeDefault" />
+        <switch :checked="form.isDefault" color="#2f7dff" @change="changeDefault" />
       </view>
       <button class="save-btn" :disabled="saving" @click="save">保存地址</button>
     </view>
@@ -230,7 +222,6 @@
     padding: 28rpx 24rpx 48rpx;
   }
 
-  .top,
   .name-row,
   .field,
   .switch-row,
@@ -239,33 +230,9 @@
     align-items: center;
   }
 
-  .top,
   .field,
   .switch-row {
     justify-content: space-between;
-  }
-
-  .title {
-    color: #1d2b26;
-    font-size: 38rpx;
-    font-weight: 700;
-  }
-
-  .subtitle {
-    margin-top: 8rpx;
-    color: #7b8580;
-    font-size: 24rpx;
-  }
-
-  .add-btn {
-    width: 128rpx;
-    height: 58rpx;
-    line-height: 58rpx;
-    padding: 0;
-    border-radius: 8rpx;
-    color: #fff;
-    background: #f06a3a;
-    font-size: 26rpx;
   }
 
   .state,
@@ -294,8 +261,8 @@
   }
 
   .address-card.default {
-    border: 1rpx solid #2f7d58;
-    background: #fbfffd;
+    border: 1rpx solid #2f7dff;
+    background: #f8fbff;
   }
 
   .name-row {
@@ -317,8 +284,8 @@
   .default-tag {
     padding: 4rpx 10rpx;
     border-radius: 6rpx;
-    color: #2f7d58;
-    background: #eaf7f0;
+    color: #2f7dff;
+    background: #eaf2ff;
     font-size: 22rpx;
   }
 

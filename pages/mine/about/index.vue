@@ -1,7 +1,7 @@
 <template>
   <view class="about-container">
     <view class="header-section text-center">
-      <image style="width: 150rpx;height: 150rpx;" src="/static/logo200.png" mode="widthFix">
+      <image class="brand-logo" src="/static/images/cooking-chef-logo.png" mode="aspectFit">
       </image>
       <uni-title type="h2" title="上门做饭"></uni-title>
     </view>
@@ -68,5 +68,10 @@
     padding: 30rpx 0 0;
     flex-direction: column;
     align-items: center;
+  }
+
+  .brand-logo {
+    width: 168rpx;
+    height: 168rpx;
   }
 </style>
