@@ -61,6 +61,11 @@
       "navigationBarTitleText": "月度结算"
     }
   }, {
+    "path": "pages/work/commission",
+    "style": {
+      "navigationBarTitleText": "本月提成"
+    }
+  }, {
     "path": "pages/mine/index",
     "style": {
       "navigationBarTitleText": "我的"

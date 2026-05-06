@@ -34,7 +34,7 @@
       </view>
     </view>
 
-    <view class="quick-actions">
+    <view class="quick-actions" :class="{ 'chef-actions': isCurrentChef }">
       <view v-if="!isCurrentChef" class="quick-item" @click="goAddress">
         <uni-icons type="location-filled" size="24" color="#f06a3a"></uni-icons>
         <text>地址管理</text>
@@ -46,6 +46,74 @@
       <view v-if="showChefRecommendations" class="quick-item" @click="loadChefs">
         <uni-icons type="refresh" size="24" color="#2f7d58"></uni-icons>
         <text>刷新推荐</text>
+      </view>
+    </view>
+
+    <view v-if="isCurrentChef" class="chef-dashboard">
+      <view class="dashboard-card status-card">
+        <view>
+          <view class="status-label">接单状态</view>
+          <view class="status-title">{{ isTakingOrders ? '营业中' : '暂停中' }}</view>
+          <view class="status-desc">{{ isTakingOrders ? '当前可接收新的预约订单' : '当前不会收到新的预约订单' }}</view>
+        </view>
+        <button
+          class="status-button"
+          :class="{ paused: !isTakingOrders }"
+          :loading="statusSwitching"
+          :disabled="statusSwitching"
+          @click="toggleTakingOrders"
+        >
+          {{ isTakingOrders ? '暂停接单' : '恢复接单' }}
+        </button>
+      </view>
+
+      <view class="dashboard-head">
+        <text class="dashboard-title">收益概览</text>
+      </view>
+      <view class="revenue-grid">
+        <view
+          v-for="item in revenueCards"
+          :key="item.label"
+          class="revenue-card"
+          :class="{ clickable: item.action === 'commission' }"
+          @click="onRevenueCardTap(item)"
+        >
+          <text class="revenue-label">{{ item.label }}</text>
+          <text class="revenue-value">{{ item.value }}</text>
+          <text v-if="item.extra" class="revenue-extra">{{ item.extra }}</text>
+        </view>
+      </view>
+
+      <view class="dashboard-card alerts-card">
+        <view class="dashboard-head inner">
+          <text class="dashboard-title">异常提醒</text>
+        </view>
+        <view v-if="limitedAlerts.length === 0" class="empty-alert">暂无异常提醒</view>
+        <view v-else class="alert-list">
+          <view v-for="item in limitedAlerts" :key="item.key || item.title" class="alert-item" :class="alertToneClass(item.tone)">
+            <view class="alert-main">
+              <view class="alert-title">{{ item.title }}</view>
+              <view class="alert-content">{{ item.content }}</view>
+            </view>
+            <view v-if="item.count" class="alert-count">{{ item.count }}</view>
+          </view>
+        </view>
+      </view>
+
+      <view class="dashboard-card trend-card">
+        <view class="dashboard-head inner">
+          <text class="dashboard-title">收入趋势</text>
+        </view>
+        <view v-if="revenueTrend.length === 0" class="empty-alert">暂无收入趋势</view>
+        <view v-else class="trend-list">
+          <view v-for="item in revenueTrend" :key="item.date || item.label" class="trend-item">
+            <text class="trend-label">{{ item.label || item.date }}</text>
+            <view class="trend-track">
+              <view class="trend-bar" :style="getTrendStyle(item)"></view>
+            </view>
+            <text class="trend-amount">{{ formatMoney(item.amount) }}</text>
+          </view>
+        </view>
       </view>
     </view>
 
@@ -84,7 +152,7 @@
 <script>
   import { getToken } from '@/utils/auth'
   import { listChefs } from '@/api/cooking/user'
-  import { getChefMy } from '@/api/cooking/chef'
+  import { getChefMy, getChefWorkbench, pauseChef, resumeChef } from '@/api/cooking/chef'
   import regionData from '@/utils/region-data'
   const chefStatus = require('@/utils/chef-status')
 
@@ -104,6 +172,8 @@
         regionColumns: [[], [], []],
         regionPickerOpen: false,
         chefProfile: {},
+        chefWorkbench: {},
+        statusSwitching: false,
         chefs: []
       }
     },
@@ -113,6 +183,46 @@
       },
       showChefRecommendations() {
         return chefStatus.shouldShowChefRecommendations(this.chefProfile)
+      },
+      isTakingOrders() {
+        const value = this.chefWorkbench.takingOrders
+        if (value !== undefined && value !== null && value !== '') {
+          return value === true || value === 1 || String(value) === '1' || String(value).toLowerCase() === 'true'
+        }
+        return chefStatus.isChefNormal(this.chefProfile)
+      },
+      revenueOverview() {
+        return this.chefWorkbench.revenueOverview || {}
+      },
+      revenueCards() {
+        return [
+          { label: '今日收入', value: this.formatMoney(this.revenueOverview.todayIncome) },
+          {
+            label: '本月提成',
+            value: this.formatMoney(this.revenueOverview.monthCommissionAmount),
+            extra: '查看每单明细',
+            action: 'commission'
+          },
+          { label: '本月完成', value: `${this.formatCount(this.revenueOverview.monthCompletedOrders)} 单` },
+          {
+            label: '应发金额',
+            value: this.formatMoney(this.revenueOverview.monthPayableAmount),
+            extra: `扣款 ${this.formatMoney(this.revenueOverview.monthDeduction)}`
+          }
+        ]
+      },
+      limitedAlerts() {
+        const alerts = Array.isArray(this.chefWorkbench.alerts) ? this.chefWorkbench.alerts : []
+        return alerts.slice(0, 3)
+      },
+      revenueTrend() {
+        return Array.isArray(this.chefWorkbench.revenueTrend) ? this.chefWorkbench.revenueTrend : []
+      },
+      maxTrendAmount() {
+        return this.revenueTrend.reduce((max, item) => {
+          const amount = Number(item.amount) || 0
+          return amount > max ? amount : max
+        }, 0)
       }
     },
     onLoad() {
@@ -121,17 +231,37 @@
     },
     methods: {
       loadPage() {
-        return this.loadCurrentChef().finally(() => this.loadChefs())
+        return this.loadCurrentChef().finally(() => {
+          if (this.isCurrentChef) {
+            this.chefs = []
+            return this.loadChefWorkbench()
+          }
+          this.chefWorkbench = {}
+          return this.loadChefs()
+        })
       },
       loadCurrentChef() {
         if (!getToken()) {
           this.chefProfile = {}
+          this.chefWorkbench = {}
           return Promise.resolve()
         }
         return getChefMy().then(res => {
           this.chefProfile = this.unwrap(res) || {}
         }).catch(() => {
           this.chefProfile = {}
+          this.chefWorkbench = {}
+        })
+      },
+      loadChefWorkbench() {
+        if (!this.isCurrentChef) {
+          this.chefWorkbench = {}
+          return Promise.resolve()
+        }
+        return getChefWorkbench().then(res => {
+          this.chefWorkbench = this.unwrap(res) || {}
+        }).catch(() => {
+          this.chefWorkbench = {}
         })
       },
       loadChefs() {
@@ -258,6 +388,50 @@
         if (!value) return []
         if (Array.isArray(value)) return value.filter(Boolean)
         return String(value).split(/[、,，\s]+/).filter(Boolean)
+      },
+      formatMoney(value) {
+        const amount = Number(value)
+        if (!Number.isFinite(amount)) return '¥0.00'
+        return `¥${amount.toFixed(2)}`
+      },
+      formatCount(value) {
+        const count = Number(value)
+        if (!Number.isFinite(count)) return 0
+        return count
+      },
+      alertToneClass(tone) {
+        const value = String(tone || '').toLowerCase()
+        if (value === 'danger' || value === 'error') return 'danger'
+        if (value === 'success') return 'success'
+        return 'warning'
+      },
+      getTrendStyle(item) {
+        const amount = Number(item.amount) || 0
+        const percent = amount > 0 && this.maxTrendAmount > 0 ? Math.max(8, Math.round((amount / this.maxTrendAmount) * 100)) : 0
+        return `width: ${percent}%;`
+      },
+      onRevenueCardTap(item) {
+        if (item && item.action === 'commission') {
+          this.goCommission()
+        }
+      },
+      goCommission() {
+        if (!this.isCurrentChef) return
+        this.requireLogin('/pages/work/commission')
+      },
+      toggleTakingOrders() {
+        if (this.statusSwitching) return
+        this.statusSwitching = true
+        const wasTakingOrders = this.isTakingOrders
+        const action = wasTakingOrders ? pauseChef : resumeChef
+        action({}).then(() => {
+          this.$modal.msg(wasTakingOrders ? '已暂停接单' : '已恢复接单')
+          return this.loadCurrentChef().then(() => this.loadChefWorkbench())
+        }).catch(() => {
+          this.$modal.msg('接单状态切换失败，请稍后再试')
+        }).finally(() => {
+          this.statusSwitching = false
+        })
       },
       openChef(chef) {
         if (!chef.id) {
@@ -402,6 +576,240 @@
     background: #fff;
     color: #2f3532;
     font-size: 24rpx;
+  }
+
+  .quick-actions.chef-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .quick-actions.chef-actions .quick-item {
+    height: 104rpx;
+    flex-direction: row;
+    gap: 16rpx;
+    font-size: 28rpx;
+    font-weight: 600;
+  }
+
+  .chef-dashboard {
+    padding: 22rpx 32rpx 4rpx;
+  }
+
+  .dashboard-card {
+    border-radius: 8rpx;
+    background: #fff;
+    box-shadow: 0 8rpx 28rpx rgba(31, 41, 37, .06);
+  }
+
+  .status-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20rpx;
+    padding: 28rpx;
+    color: #7a351b;
+    background: linear-gradient(135deg, #fff2e4 0%, #ffe1c8 100%);
+  }
+
+  .status-label {
+    color: #b86a2f;
+    font-size: 24rpx;
+  }
+
+  .status-title {
+    margin-top: 8rpx;
+    color: #4a2516;
+    font-size: 36rpx;
+    font-weight: 700;
+  }
+
+  .status-desc {
+    margin-top: 8rpx;
+    color: #8d684e;
+    font-size: 24rpx;
+  }
+
+  .status-button {
+    width: 176rpx;
+    height: 68rpx;
+    line-height: 68rpx;
+    padding: 0;
+    flex-shrink: 0;
+    border-radius: 8rpx;
+    color: #fff;
+    font-size: 26rpx;
+    background: #e85d34;
+  }
+
+  .status-button.paused {
+    background: #2f7d58;
+  }
+
+  .dashboard-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 30rpx 0 18rpx;
+  }
+
+  .dashboard-head.inner {
+    padding: 0 0 20rpx;
+  }
+
+  .dashboard-title {
+    color: #1d2b26;
+    font-size: 32rpx;
+    font-weight: 700;
+  }
+
+  .revenue-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 18rpx;
+  }
+
+  .revenue-card {
+    min-height: 128rpx;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 24rpx;
+    border-radius: 8rpx;
+    background: #fff;
+    box-shadow: 0 8rpx 28rpx rgba(31, 41, 37, .06);
+  }
+
+  .revenue-card.clickable {
+    position: relative;
+    border: 2rpx solid rgba(240, 106, 58, .18);
+    background: linear-gradient(135deg, #fff 0%, #fff4e7 100%);
+  }
+
+  .revenue-label,
+  .revenue-extra {
+    color: #7b8580;
+    font-size: 24rpx;
+  }
+
+  .revenue-value {
+    margin-top: 10rpx;
+    color: #17231f;
+    font-size: 34rpx;
+    font-weight: 700;
+  }
+
+  .revenue-extra {
+    margin-top: 8rpx;
+  }
+
+  .alerts-card,
+  .trend-card {
+    margin-top: 22rpx;
+    padding: 26rpx;
+  }
+
+  .empty-alert {
+    padding: 28rpx 0;
+    color: #8a8f98;
+    text-align: center;
+    font-size: 26rpx;
+  }
+
+  .alert-list {
+    display: flex;
+    flex-direction: column;
+    gap: 16rpx;
+  }
+
+  .alert-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18rpx;
+    padding: 20rpx;
+    border-radius: 8rpx;
+    background: #fff8e8;
+    border-left: 6rpx solid #f0a83a;
+  }
+
+  .alert-item.danger {
+    background: #fff0ee;
+    border-left-color: #e25545;
+  }
+
+  .alert-item.success {
+    background: #edf8f1;
+    border-left-color: #2f9b68;
+  }
+
+  .alert-main {
+    min-width: 0;
+    flex: 1;
+  }
+
+  .alert-title {
+    color: #25302c;
+    font-size: 28rpx;
+    font-weight: 700;
+  }
+
+  .alert-content {
+    margin-top: 8rpx;
+    color: #7b8580;
+    font-size: 24rpx;
+    line-height: 1.45;
+  }
+
+  .alert-count {
+    min-width: 48rpx;
+    height: 48rpx;
+    line-height: 48rpx;
+    border-radius: 24rpx;
+    color: #fff;
+    text-align: center;
+    font-size: 24rpx;
+    background: #e85d34;
+  }
+
+  .trend-list {
+    display: flex;
+    flex-direction: column;
+    gap: 18rpx;
+  }
+
+  .trend-item {
+    display: grid;
+    grid-template-columns: 112rpx minmax(0, 1fr) 128rpx;
+    align-items: center;
+    gap: 16rpx;
+  }
+
+  .trend-label,
+  .trend-amount {
+    color: #66716c;
+    font-size: 24rpx;
+  }
+
+  .trend-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .trend-amount {
+    text-align: right;
+  }
+
+  .trend-track {
+    height: 18rpx;
+    overflow: hidden;
+    border-radius: 8rpx;
+    background: #f0e7dd;
+  }
+
+  .trend-bar {
+    height: 18rpx;
+    border-radius: 8rpx;
+    background: linear-gradient(90deg, #f06a3a 0%, #f4ad54 100%);
   }
 
   .section-head {

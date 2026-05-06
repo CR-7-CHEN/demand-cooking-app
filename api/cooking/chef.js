@@ -9,6 +9,21 @@ export function getChefMy() {
   })
 }
 
+export function getChefWorkbench() {
+  return request({
+    url: '/cooking/chef/workbench',
+    method: 'get'
+  })
+}
+
+export function getChefCommissionOrders(params) {
+  return request({
+    url: '/cooking/chef/commission/orders',
+    method: 'get',
+    params
+  })
+}
+
 export function applyChef(data) {
   return request({
     url: '/cooking/chef/apply',

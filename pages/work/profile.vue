@@ -23,6 +23,19 @@
         <input class="input" v-model.trim="form.phone" type="number" maxlength="11" placeholder="请输入 11 位手机号" />
       </view>
       <view class="field">
+        <text class="label">性别</text>
+        <view class="gender-options">
+          <view
+            v-for="item in genderOptions"
+            :key="item.value"
+            :class="['gender-option', form.gender === item.value ? 'active' : '']"
+            @click="setGender(item.value)"
+          >
+            <text>{{ item.label }}</text>
+          </view>
+        </view>
+      </view>
+      <view class="field">
         <text class="label">头像</text>
         <view class="upload-row">
           <view class="avatar-uploader" @click="chooseAvatar">
@@ -181,6 +194,11 @@
         serviceAreaList: [],
         chefTimes: [],
         regionValue: [],
+        genderOptions: [
+          { label: '男', value: '0' },
+          { label: '女', value: '1' },
+          { label: '未知', value: '2' }
+        ],
         timeStatusOptions: [
           { label: '启用', value: '0' },
           { label: '停用', value: '1' }
@@ -196,6 +214,7 @@
         form: {
           realName: '',
           phone: '',
+          gender: '2',
           avatarUrl: '',
           workImageUrls: '',
           cuisineTags: '',
@@ -321,12 +340,21 @@
         const end = item.endTime || ''
         return `${this.formatDate(start)} ${this.formatTime(start)}-${this.formatTime(end)}`
       },
+      normalizeGender(value) {
+        const text = String(value === undefined || value === null ? '' : value)
+        if (['0', '1', '2'].includes(text)) return text
+        if (text === '男') return '0'
+        if (text === '女') return '1'
+        return '2'
+      },
       timeStatusText(status) {
         return status === '1' ? '停用' : '启用'
       },
       fill(data) {
         this.form.realName = data.realName || data.name || data.chefName || ''
         this.form.phone = data.phone || data.mobile || ''
+        const rawGender = data.gender === undefined || data.gender === null ? data.sex : data.gender
+        this.form.gender = this.normalizeGender(rawGender)
         this.form.avatarUrl = data.avatarUrl || data.avatar || ''
         this.workImageList = this.toArray(data.workImageUrls || data.workImages || data.works).slice(0, this.maxWorkImages)
         this.syncWorkImageUrls()
@@ -353,6 +381,9 @@
       onTimeStatusChange(e) {
         const index = Number(e.detail.value || 0)
         this.timeForm.status = this.timeStatusOptions[index].value
+      },
+      setGender(value) {
+        this.form.gender = value || '2'
       },
       onRegionChange(e) {
         const value = e.detail.value || []
@@ -577,6 +608,7 @@
         return {
           chefName: this.form.realName,
           mobile: this.form.phone,
+          gender: this.form.gender,
           avatarUrl: this.form.avatarUrl,
           workImageUrls: this.form.workImageUrls,
           skillTags: this.form.cuisineTags,
@@ -895,6 +927,31 @@
     color: #7c8980;
     font-size: 24rpx;
     line-height: 1.45;
+  }
+
+  .gender-options {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16rpx;
+  }
+
+  .gender-option {
+    height: 76rpx;
+    line-height: 76rpx;
+    border: 1rpx solid #e2e8e4;
+    border-radius: 8rpx;
+    background: #fbfcfb;
+    color: #415047;
+    font-size: 28rpx;
+    text-align: center;
+    box-sizing: border-box;
+  }
+
+  .gender-option.active {
+    border-color: #2f8f55;
+    background: #ecf7ef;
+    color: #176c35;
+    font-weight: 700;
   }
 
   .image-grid {
