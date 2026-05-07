@@ -21,11 +21,6 @@
       </view>
     </scroll-view>
 
-    <view class="input-bar">
-      <input class="question-input" v-model="question" confirm-type="send" placeholder="请输入要咨询的问题"
-        @confirm="sendQuestion" />
-      <button class="send-btn" :disabled="loading" @click="sendQuestion">发送</button>
-    </view>
   </view>
 </template>
 
@@ -50,7 +45,6 @@
   export default {
     data() {
       return {
-        question: '',
         loading: false,
         faqs: localFaqs,
         orders: [],
@@ -94,13 +88,11 @@
         })
       },
       askQuick(text) {
-        this.question = text
-        this.sendQuestion()
+        this.askRobotQuestion(text)
       },
-      sendQuestion() {
-        const text = (this.question || '').trim()
+      askRobotQuestion(question) {
+        const text = (question || '').trim()
         if (!text || this.loading) return
-        this.question = ''
         this.messages.push({ role: 'user', content: text })
         this.loading = true
 
@@ -250,29 +242,4 @@
     background: #f06a3a;
   }
 
-  .input-bar {
-    display: flex;
-    align-items: center;
-    margin-bottom: 20rpx;
-  }
-
-  .question-input {
-    flex: 1;
-    height: 78rpx;
-    padding: 0 22rpx;
-    background: #fff;
-    border-radius: 8rpx;
-    font-size: 28rpx;
-  }
-
-  .send-btn {
-    width: 140rpx;
-    height: 78rpx;
-    line-height: 78rpx;
-    margin-left: 16rpx;
-    font-size: 28rpx;
-    color: #fff;
-    background: #f06a3a;
-    border-radius: 8rpx;
-  }
 </style>

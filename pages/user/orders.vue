@@ -1,9 +1,5 @@
 <template>
   <view class="page">
-    <view class="header">
-      <button class="refresh-btn" @click="loadOrders">刷新</button>
-    </view>
-
     <scroll-view scroll-x class="tabs">
       <view
         v-for="item in tabs"
@@ -57,6 +53,11 @@
     onShow() {
       this.enterPage()
     },
+    onPullDownRefresh() {
+      this.enterPage().finally(() => {
+        uni.stopPullDownRefresh()
+      })
+    },
     methods: {
       enterPage() {
         return this.loadCurrentChef().then(() => {
@@ -81,7 +82,7 @@
       },
       loadOrders() {
         this.loading = true
-        listMyOrders({
+        return listMyOrders({
           statusGroup: this.activeStatus
         }).then(res => {
           this.orders = this.pickList(res).map(this.normalizeOrder)
@@ -167,27 +168,11 @@
     padding: 28rpx 24rpx 48rpx;
   }
 
-  .header,
   .order-head,
   .footer {
     display: flex;
     align-items: center;
     justify-content: space-between;
-  }
-
-  .header {
-    justify-content: flex-end;
-  }
-
-  .refresh-btn {
-    width: 128rpx;
-    height: 58rpx;
-    line-height: 58rpx;
-    padding: 0;
-    border-radius: 8rpx;
-    color: #fff;
-    background: #f06a3a;
-    font-size: 26rpx;
   }
 
   .tabs {

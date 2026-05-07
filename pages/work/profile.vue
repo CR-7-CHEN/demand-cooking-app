@@ -1,13 +1,5 @@
 <template>
   <view class="page">
-    <view class="head-card">
-      <view>
-        <text class="sub">入驻/资料维护</text>
-        <view class="title">{{ statusText }}</view>
-      </view>
-      <text :class="['chip', statusTone]">{{ chipText }}</text>
-    </view>
-
     <view v-if="rejectReason" class="warn-card">
       <view class="warn-title">驳回原因</view>
       <view class="warn-text">{{ rejectReason }}</view>
@@ -23,23 +15,27 @@
         <input class="input" v-model.trim="form.phone" type="number" maxlength="11" placeholder="请输入 11 位手机号" />
       </view>
       <view class="field">
+        <text class="label">年龄</text>
+        <input class="input" v-model.trim="form.age" type="number" maxlength="3" placeholder="请输入年龄" />
+      </view>
+      <view class="field">
         <text class="label">性别</text>
-        <view class="gender-options">
-          <view
+        <radio-group class="gender-options" @change="onGenderChange">
+          <label
             v-for="item in genderOptions"
             :key="item.value"
             :class="['gender-option', form.gender === item.value ? 'active' : '']"
-            @click="setGender(item.value)"
           >
+            <radio class="gender-radio" :value="item.value" :checked="form.gender === item.value" color="#2f8f55" />
             <text>{{ item.label }}</text>
-          </view>
-        </view>
+          </label>
+        </radio-group>
       </view>
       <view class="field">
         <text class="label">头像</text>
         <view class="upload-row">
           <view class="avatar-uploader" @click="chooseAvatar">
-            <image v-if="form.avatarUrl" class="avatar-preview" :src="form.avatarUrl" mode="aspectFill"></image>
+            <image v-if="form.avatarUrl" class="avatar-preview" :src="form.avatarUrl" mode="aspectFill" @click.stop="openImagePreview(form.avatarUrl)"></image>
             <view v-if="form.avatarUrl" class="image-remove" @click.stop="removeAvatar">×</view>
             <view v-else class="upload-placeholder">
               <text class="upload-plus">+</text>
@@ -53,7 +49,7 @@
         <text class="label">作品图</text>
         <view class="image-grid">
           <view v-for="(item, index) in workImageList" :key="item + index" class="work-image">
-            <image :src="item" mode="aspectFill"></image>
+            <image :src="item" mode="aspectFill" @click="openImagePreview(item)"></image>
             <view class="image-remove" @click.stop="removeWorkImage(index)">×</view>
           </view>
           <view v-if="canAddWorkImage" class="image-add" @click="chooseWorkImages">
@@ -68,8 +64,19 @@
       </view>
       <view class="field">
         <text class="label">服务区域</text>
-        <picker mode="region" :value="regionValue" @change="onRegionChange">
-          <view class="input picker add-region">{{ serviceAreaList.length ? '继续添加服务区域' : '请选择省 / 市 / 区' }}</view>
+        <picker
+          mode="multiSelector"
+          :range="regionRange"
+          :value="regionValue"
+          @click="onRegionPickerOpen"
+          @columnchange="onRegionColumnChange"
+          @change="onRegionChange"
+          @cancel="onRegionCancel"
+        >
+          <view :class="['input', 'picker', 'add-region', regionPickerOpen ? 'top' : 'bottom']" @click="onRegionPickerOpen">
+            <text>{{ serviceAreaList.length ? '继续添加服务区域' : '请选择省 / 市 / 区' }}</text>
+            <text class="picker-arrow"></text>
+          </view>
         </picker>
         <view v-if="serviceAreaList.length" class="area-list">
           <view v-for="(item, index) in serviceAreaList" :key="item + index" class="area-tag">
@@ -88,7 +95,7 @@
         <text class="label">健康证图片</text>
         <view class="image-grid">
           <view v-if="form.healthCertificateImageUrl" class="work-image">
-            <image :src="form.healthCertificateImageUrl" mode="aspectFill" @click="previewImage(form.healthCertificateImageUrl)"></image>
+            <image :src="form.healthCertificateImageUrl" mode="aspectFill" @click="openImagePreview(form.healthCertificateImageUrl)"></image>
             <view class="image-remove" @click.stop="removeHealthCertificateImage">×</view>
           </view>
           <view v-else class="image-add" @click="chooseHealthCertificateImage">
@@ -101,68 +108,26 @@
         <text class="label">个人简介</text>
         <textarea class="textarea intro" v-model.trim="form.introduction" placeholder="介绍服务经验、拿手菜和服务风格"></textarea>
       </view>
-    </view>
-
-    <view v-if="canManageTime" class="time-card">
-      <view class="section-head">
-        <view>
-          <view class="section-title">可预约时间</view>
-          <view class="section-desc">下单会按此时间段校验，并锁定默认 3 小时服务窗口</view>
-        </view>
-        <button class="small-btn" size="mini" @click="resetTimeForm">新增</button>
-      </view>
-
-      <view v-if="chefTimes.length" class="time-list">
-        <view v-for="item in chefTimes" :key="item.timeId" class="time-row">
-          <view class="time-info">
-            <text class="time-range">{{ formatTimeRange(item) }}</text>
-            <text :class="['time-status', item.status === '1' ? 'off' : 'on']">{{ timeStatusText(item.status) }}</text>
-            <text v-if="item.remark" class="time-remark">{{ item.remark }}</text>
+      <view class="field">
+        <text class="label">可预约时间</text>
+        <view class="input picker available-time-entry" @click="openAvailableTimePage">
+          <view class="available-time-main">
+            <text class="available-time-title">{{ availableTimeSummary }}</text>
+            <text v-if="chefTimes.length" class="available-time-sub">{{ formatTimeRange(chefTimes[0]) }}</text>
           </view>
-          <view class="time-actions">
-            <text class="text-action" @click="editTime(item)">编辑</text>
-            <text class="text-action danger" @click="removeTime(item)">删除</text>
-          </view>
+          <text class="entry-arrow"></text>
         </view>
-      </view>
-      <view v-else class="empty-time">暂无可预约时间，请先添加时间段</view>
-
-      <view class="time-form">
-        <view class="field">
-          <text class="label">日期</text>
-          <picker mode="date" :value="timeForm.date" @change="onTimeDateChange">
-            <view class="input picker">{{ timeForm.date || '请选择日期' }}</view>
-          </picker>
-        </view>
-        <view class="time-grid">
-          <view class="field">
-            <text class="label">开始</text>
-            <picker mode="time" :value="timeForm.startTime" @change="onStartTimeChange">
-              <view class="input picker">{{ timeForm.startTime || '请选择' }}</view>
-            </picker>
-          </view>
-          <view class="field">
-            <text class="label">结束</text>
-            <picker mode="time" :value="timeForm.endTime" @change="onEndTimeChange">
-              <view class="input picker">{{ timeForm.endTime || '请选择' }}</view>
-            </picker>
-          </view>
-        </view>
-        <view class="field">
-          <text class="label">状态</text>
-          <picker :range="timeStatusOptions" range-key="label" :value="timeStatusIndex" @change="onTimeStatusChange">
-            <view class="input picker">{{ timeStatusOptions[timeStatusIndex].label }}</view>
-          </picker>
-        </view>
-        <view class="field">
-          <text class="label">备注</text>
-          <input class="input" v-model.trim="timeForm.remark" placeholder="如 午餐档、晚餐档" />
-        </view>
-        <button class="time-submit" :loading="timeSubmitting" @click="saveTime">{{ timeForm.timeId ? '保存时间段' : '添加时间段' }}</button>
       </view>
     </view>
 
     <button class="submit" :loading="submitting" @click="submit">{{ submitText }}</button>
+
+    <view v-if="imagePreviewVisible" class="image-preview-mask" @click="closeImagePreview">
+      <view class="image-preview-panel" @click.stop>
+        <view class="preview-close" @click="closeImagePreview">×</view>
+        <image class="preview-image" :src="previewImageUrl" mode="aspectFit"></image>
+      </view>
+    </view>
   </view>
 </template>
 
@@ -172,49 +137,44 @@
     applyChef,
     updateChefMy,
     uploadChefImage,
-    getChefTime,
-    addChefTime,
-    updateChefTime,
-    deleteChefTime
+    getChefTime
   } from '@/api/cooking/chef'
+  import regionData from '@/utils/region-data'
   const chefStatus = require('@/utils/chef-status')
+  const AVAILABLE_TIME_DRAFT_KEY = 'work_profile_available_time_draft'
+  const AVAILABLE_TIME_RESULT_KEY = 'work_profile_available_time_result'
+  const MEAL_OPTIONS = ['早餐', '午餐', '晚餐']
 
   export default {
     data() {
       return {
         chef: {},
+        profileInitialized: false,
+        profileDirty: false,
+        fillingProfile: false,
         submitting: false,
         uploadingAvatar: false,
         uploadingWorks: false,
         uploadingHealthCertificate: false,
         timeLoading: false,
-        timeSubmitting: false,
+        imagePreviewVisible: false,
+        previewImageUrl: '',
         maxWorkImages: 5,
         workImageList: [],
         serviceAreaList: [],
         chefTimes: [],
-        regionValue: [],
+        regionValue: [0, 0, 0],
+        regionPickerOpen: false,
         genderOptions: [
           { label: '男', value: '0' },
           { label: '女', value: '1' },
-          { label: '未知', value: '2' }
+          { label: '其他', value: '2' }
         ],
-        timeStatusOptions: [
-          { label: '启用', value: '0' },
-          { label: '停用', value: '1' }
-        ],
-        timeForm: {
-          timeId: null,
-          date: '',
-          startTime: '',
-          endTime: '',
-          status: '0',
-          remark: ''
-        },
         form: {
           realName: '',
           phone: '',
-          gender: '2',
+          age: '',
+          gender: '',
           avatarUrl: '',
           workImageUrls: '',
           cuisineTags: '',
@@ -235,33 +195,6 @@
       rejectReason() {
         return this.chef.rejectReason || this.chef.auditRejectReason || this.chef.reason || ''
       },
-      statusText() {
-        if (this.isNew) return '未申请入驻'
-        if (chefStatus.isChefApproved(this.chef) && chefStatus.isChefPaused(this.chef)) return '暂停接单'
-        if (chefStatus.isChefApproved(this.chef) && chefStatus.isChefNormal(this.chef)) return '审核通过'
-        if (chefStatus.isChefPending(this.chef)) return '待平台审核'
-        if (this.isRejected) return '审核驳回'
-        if (chefStatus.isChefDisabled(this.chef)) return '已禁用'
-        if (chefStatus.isChefResigned(this.chef)) return '已离职'
-        return this.chef.statusName || '资料待完善'
-      },
-      chipText() {
-        if (this.isNew) return '可申请'
-        if (this.isRejected) return '可重提'
-        if (chefStatus.isChefWorkbenchAvailable(this.chef)) return '可维护'
-        if (chefStatus.isChefPending(this.chef)) return '审核中'
-        return '受限'
-      },
-      chipTone() {
-        return this.statusTone
-      },
-      statusTone() {
-        if (chefStatus.isChefWorkbenchAvailable(this.chef)) return 'ok'
-        if (chefStatus.isChefPending(this.chef)) return 'warn'
-        if (this.isRejected) return 'danger'
-        if (chefStatus.isChefDisabled(this.chef) || chefStatus.isChefResigned(this.chef)) return 'danger'
-        return 'muted'
-      },
       submitText() {
         if (this.isNew) return '提交入驻申请'
         if (this.isRejected) return '重新提交审核'
@@ -273,27 +206,82 @@
       canManageTime() {
         return !!(this.chef && (this.chef.chefId || this.chef.id))
       },
-      timeStatusIndex() {
-        const index = this.timeStatusOptions.findIndex(item => item.value === this.timeForm.status)
-        return index > -1 ? index : 0
+      availableTimeSummary() {
+        return this.chefTimes.length ? `已设置 ${this.chefTimes.length} 个时间段` : '点击设置可预约时间'
+      },
+      regionRange() {
+        const provinceList = this.getProvinceList()
+        const cityList = this.getCityList(this.regionValue[0])
+        const districtList = this.getDistrictList(this.regionValue[0], this.regionValue[1])
+        return [
+          provinceList.map(item => item.name),
+          cityList.map(item => item.name),
+          districtList
+        ]
+      }
+    },
+    watch: {
+      form: {
+        deep: true,
+        handler() {
+          this.markDirty()
+        }
+      },
+      workImageList: {
+        deep: true,
+        handler() {
+          this.markDirty()
+        }
+      },
+      serviceAreaList: {
+        deep: true,
+        handler() {
+          this.markDirty()
+        }
       }
     },
     onShow() {
+      const consumed = this.consumeAvailableTimeDraft()
+      if (consumed && this.profileInitialized) return
       this.load()
     },
     methods: {
-      load() {
-        getChefMy().then(res => {
-          this.chef = this.unwrap(res) || {}
-          this.fill(this.chef)
+      markDirty() {
+        if (this.fillingProfile) return
+        this.profileDirty = true
+      },
+      load(options = {}) {
+        const force = !!options.force
+        if (!force && this.profileInitialized && this.profileDirty) {
           if (this.canManageTime) {
+            this.loadChefTimes()
+          }
+          return Promise.resolve()
+        }
+        return getChefMy().then(res => {
+          const chef = this.unwrap(res) || {}
+          this.chef = chef
+          if (!force && this.profileDirty) {
+            if (this.canManageTime) {
+              this.loadChefTimes()
+            }
+            return
+          }
+          this.fill(chef)
+          this.profileInitialized = true
+          this.profileDirty = false
+          if (Array.isArray(chef.availableTimes)) {
+            this.chefTimes = this.toTimeList(chef.availableTimes)
+          } else if (this.canManageTime) {
             this.loadChefTimes()
           } else {
             this.chefTimes = []
           }
         }).catch(() => {
-          this.chef = {}
-          this.chefTimes = []
+          if (force || !this.profileInitialized || !this.profileDirty) {
+            this.chef = {}
+            this.chefTimes = []
+          }
         })
       },
       loadChefTimes() {
@@ -345,50 +333,69 @@
         if (['0', '1', '2'].includes(text)) return text
         if (text === '男') return '0'
         if (text === '女') return '1'
-        return '2'
+        if (text === '其他') return '2'
+        return ''
       },
       timeStatusText(status) {
         return status === '1' ? '停用' : '启用'
       },
       fill(data) {
-        this.form.realName = data.realName || data.name || data.chefName || ''
-        this.form.phone = data.phone || data.mobile || ''
-        const rawGender = data.gender === undefined || data.gender === null ? data.sex : data.gender
-        this.form.gender = this.normalizeGender(rawGender)
-        this.form.avatarUrl = data.avatarUrl || data.avatar || ''
-        this.workImageList = this.toArray(data.workImageUrls || data.workImages || data.works).slice(0, this.maxWorkImages)
-        this.syncWorkImageUrls()
-        this.form.cuisineTags = this.stringify(data.cuisineTags || data.cuisines || data.goodAtCuisine || data.skillTags)
-        this.serviceAreaList = this.toServiceAreaList(data)
-        this.syncServiceAreas()
-        this.regionValue = this.toRegionValue(this.form.serviceArea)
-        this.form.healthCertificateImageUrl = data.healthCertificateImageUrl || data.healthCertImageUrl || data.healthImageUrl || ''
-        this.form.healthCertificateExpireDate = this.formatDate(data.healthCertificateExpireDate || data.healthCertExpireDate || data.healthExpireDate)
-        this.form.introduction = data.introduction || data.profile || data.description || data.intro || ''
+        this.fillingProfile = true
+        try {
+          this.form.realName = data.realName || data.name || data.chefName || ''
+          this.form.phone = data.phone || data.mobile || ''
+          this.form.age = data.age === undefined || data.age === null ? '' : String(data.age)
+          const rawGender = data.gender === undefined || data.gender === null ? data.sex : data.gender
+          this.form.gender = this.normalizeGender(rawGender)
+          this.form.avatarUrl = data.avatarUrl || data.avatar || ''
+          this.workImageList = this.toArray(data.workImageUrls || data.workImages || data.works).slice(0, this.maxWorkImages)
+          this.syncWorkImageUrls()
+          this.form.cuisineTags = this.stringify(data.cuisineTags || data.cuisines || data.goodAtCuisine || data.skillTags)
+          this.serviceAreaList = this.toServiceAreaList(data)
+          this.syncServiceAreas()
+          this.regionValue = this.toRegionValue(this.form.serviceArea)
+          this.form.healthCertificateImageUrl = data.healthCertificateImageUrl || data.healthCertImageUrl || data.healthImageUrl || ''
+          this.form.healthCertificateExpireDate = this.formatDate(data.healthCertificateExpireDate || data.healthCertExpireDate || data.healthExpireDate)
+          this.form.introduction = data.introduction || data.profile || data.description || data.intro || ''
+          this.$nextTick(() => {
+            this.fillingProfile = false
+          })
+        } catch (error) {
+          this.fillingProfile = false
+          throw error
+        }
       },
       onDateChange(e) {
         this.form.healthCertificateExpireDate = e.detail.value
       },
-      onTimeDateChange(e) {
-        this.timeForm.date = e.detail.value
+      onGenderChange(event) {
+        this.form.gender = event.detail.value || ''
       },
-      onStartTimeChange(e) {
-        this.timeForm.startTime = e.detail.value
+      onRegionPickerOpen() {
+        this.regionPickerOpen = true
       },
-      onEndTimeChange(e) {
-        this.timeForm.endTime = e.detail.value
+      onRegionCancel() {
+        this.regionPickerOpen = false
       },
-      onTimeStatusChange(e) {
-        const index = Number(e.detail.value || 0)
-        this.timeForm.status = this.timeStatusOptions[index].value
-      },
-      setGender(value) {
-        this.form.gender = value || '2'
+      onRegionColumnChange(e) {
+        const detail = e.detail || {}
+        const column = Number(detail.column || 0)
+        const value = Number(detail.value || 0)
+        const nextValue = this.regionValue.slice()
+        nextValue[column] = value
+        if (column === 0) {
+          nextValue[1] = 0
+          nextValue[2] = 0
+        } else if (column === 1) {
+          nextValue[2] = 0
+        }
+        this.regionValue = this.normalizeRegionValue(nextValue)
       },
       onRegionChange(e) {
-        const value = e.detail.value || []
+        this.regionPickerOpen = false
+        const value = this.normalizeRegionValue(e.detail.value || this.regionValue)
         this.regionValue = value
-        const areaName = value.filter(Boolean).join(' ')
+        const areaName = this.getRegionName(value)
         if (areaName && this.serviceAreaList.indexOf(areaName) === -1) {
           this.serviceAreaList.push(areaName)
           this.syncServiceAreas()
@@ -396,7 +403,42 @@
       },
       toRegionValue(value) {
         const parts = String(value || '').split(/\s+/).filter(Boolean)
-        return parts.length >= 3 ? parts.slice(0, 3) : []
+        return parts.length >= 3 ? this.findRegionValue(parts.slice(0, 3)) : [0, 0, 0]
+      },
+      getProvinceList() {
+        return Array.isArray(regionData) ? regionData : []
+      },
+      getCityList(provinceIndex) {
+        const province = this.getProvinceList()[Number(provinceIndex || 0)] || {}
+        return Array.isArray(province.children) ? province.children : []
+      },
+      getDistrictList(provinceIndex, cityIndex) {
+        const city = this.getCityList(provinceIndex)[Number(cityIndex || 0)] || {}
+        return Array.isArray(city.children) ? city.children : []
+      },
+      normalizeRegionValue(value) {
+        const provinceList = this.getProvinceList()
+        const provinceIndex = Math.min(Math.max(Number(value[0] || 0), 0), Math.max(provinceList.length - 1, 0))
+        const cityList = this.getCityList(provinceIndex)
+        const cityIndex = Math.min(Math.max(Number(value[1] || 0), 0), Math.max(cityList.length - 1, 0))
+        const districtList = this.getDistrictList(provinceIndex, cityIndex)
+        const districtIndex = Math.min(Math.max(Number(value[2] || 0), 0), Math.max(districtList.length - 1, 0))
+        return [provinceIndex, cityIndex, districtIndex]
+      },
+      getRegionName(value) {
+        const regionValue = this.normalizeRegionValue(value)
+        const province = this.getProvinceList()[regionValue[0]]
+        const city = this.getCityList(regionValue[0])[regionValue[1]]
+        const district = this.getDistrictList(regionValue[0], regionValue[1])[regionValue[2]]
+        return [province && province.name, city && city.name, district].filter(Boolean).join(' ')
+      },
+      findRegionValue(parts) {
+        const provinceIndex = this.getProvinceList().findIndex(item => item.name === parts[0])
+        if (provinceIndex < 0) return [0, 0, 0]
+        const cityIndex = this.getCityList(provinceIndex).findIndex(item => item.name === parts[1])
+        if (cityIndex < 0) return [provinceIndex, 0, 0]
+        const districtIndex = this.getDistrictList(provinceIndex, cityIndex).findIndex(item => item === parts[2])
+        return this.normalizeRegionValue([provinceIndex, cityIndex, districtIndex < 0 ? 0 : districtIndex])
       },
       toServiceAreaList(data) {
         const raw = data.serviceAreas || data.serviceArea || data.area || data.areaName || ''
@@ -526,68 +568,29 @@
         this.serviceAreaList.splice(index, 1)
         this.syncServiceAreas()
       },
-      resetTimeForm() {
-        this.timeForm = {
-          timeId: null,
-          date: '',
-          startTime: '',
-          endTime: '',
-          status: '0',
-          remark: ''
-        }
+      openAvailableTimePage() {
+        uni.setStorageSync(AVAILABLE_TIME_DRAFT_KEY, this.chefTimes || [])
+        uni.navigateTo({ url: '/pages/work/profile-time' })
       },
-      editTime(item) {
-        this.timeForm = {
-          timeId: item.timeId,
-          date: this.formatDate(item.startTime),
-          startTime: this.formatTime(item.startTime),
-          endTime: this.formatTime(item.endTime),
+      consumeAvailableTimeDraft() {
+        const draft = uni.getStorageSync(AVAILABLE_TIME_RESULT_KEY)
+        if (!Array.isArray(draft)) return false
+        uni.removeStorageSync(AVAILABLE_TIME_RESULT_KEY)
+        this.chefTimes = this.toTimeList(draft)
+        this.markDirty()
+        return true
+      },
+      buildAvailableTimesPayload() {
+        return (this.chefTimes || []).map(item => ({
+          startTime: item.startTime,
+          endTime: item.endTime,
           status: item.status || '0',
-          remark: item.remark || ''
-        }
+          remark: this.normalizeMealRemark(item.remark)
+        })).filter(item => item.startTime && item.endTime)
       },
-      buildTimePayload() {
-        return {
-          timeId: this.timeForm.timeId,
-          startTime: `${this.timeForm.date} ${this.timeForm.startTime}:00`,
-          endTime: `${this.timeForm.date} ${this.timeForm.endTime}:00`,
-          status: this.timeForm.status,
-          remark: this.timeForm.remark
-        }
-      },
-      validateTime() {
-        if (!this.timeForm.date) return '请选择日期'
-        if (!this.timeForm.startTime) return '请选择开始时间'
-        if (!this.timeForm.endTime) return '请选择结束时间'
-        const start = new Date(`${this.timeForm.date.replace(/-/g, '/')} ${this.timeForm.startTime}:00`)
-        const end = new Date(`${this.timeForm.date.replace(/-/g, '/')} ${this.timeForm.endTime}:00`)
-        if (!start.getTime() || !end.getTime()) return '请选择有效时间'
-        if (end.getTime() <= start.getTime()) return '结束时间必须晚于开始时间'
-        return ''
-      },
-      saveTime() {
-        const message = this.validateTime()
-        if (message) {
-          this.$modal.showToast(message)
-          return
-        }
-        const action = this.timeForm.timeId ? updateChefTime : addChefTime
-        this.timeSubmitting = true
-        action(this.buildTimePayload()).then(() => {
-          this.$modal.msgSuccess(this.timeForm.timeId ? '时间段已保存' : '时间段已添加')
-          this.resetTimeForm()
-          this.loadChefTimes()
-        }).finally(() => {
-          this.timeSubmitting = false
-        })
-      },
-      removeTime(item) {
-        this.$modal.confirm('确认删除该可预约时间段吗？').then(() => {
-          return deleteChefTime(item.timeId)
-        }).then(() => {
-          this.$modal.msgSuccess('时间段已删除')
-          this.loadChefTimes()
-        })
+      normalizeMealRemark(value) {
+        const remark = String(value || '').trim()
+        return MEAL_OPTIONS.includes(remark) ? remark : ''
       },
       syncServiceAreas() {
         this.form.serviceArea = this.serviceAreaList.join('、')
@@ -595,12 +598,14 @@
       syncWorkImageUrls() {
         this.form.workImageUrls = this.workImageList.join(',')
       },
-      previewImage(url) {
+      openImagePreview(url) {
         if (!url) return
-        uni.previewImage({
-          current: url,
-          urls: [url]
-        })
+        this.previewImageUrl = url
+        this.imagePreviewVisible = true
+      },
+      closeImagePreview() {
+        this.imagePreviewVisible = false
+        this.previewImageUrl = ''
       },
       buildPayload() {
         this.syncWorkImageUrls()
@@ -608,6 +613,7 @@
         return {
           chefName: this.form.realName,
           mobile: this.form.phone,
+          age: Number(this.form.age),
           gender: this.form.gender,
           avatarUrl: this.form.avatarUrl,
           workImageUrls: this.form.workImageUrls,
@@ -618,17 +624,21 @@
           healthCertificateImageUrl: this.form.healthCertificateImageUrl,
           healthCertImageUrl: this.form.healthCertificateImageUrl,
           healthCertExpireDate: this.form.healthCertificateExpireDate,
-          intro: this.form.introduction
+          intro: this.form.introduction,
+          availableTimes: this.buildAvailableTimesPayload()
         }
       },
       validate() {
         if (!this.form.realName) return '请填写真实姓名'
         if (!/^1\d{10}$/.test(this.form.phone)) return '请填写 11 位手机号'
+        if (!this.form.age) return '请填写年龄'
+        if (!/^\d{1,3}$/.test(this.form.age) || Number(this.form.age) < 1 || Number(this.form.age) > 120) return '请填写有效年龄'
         if (!this.form.cuisineTags) return '请填写擅长菜系'
         if (!this.form.serviceArea) return '请填写服务区域'
         if (this.workImageList.length > this.maxWorkImages) return '作品图最多上传 5 张'
         if (!this.form.healthCertificateImageUrl) return '请上传健康证图片'
         if (!this.form.healthCertificateExpireDate) return '请选择健康证有效期'
+        if ((this.chefTimes || []).some(item => !this.normalizeMealRemark(item.remark))) return '请完善可预约时间的三餐选择'
         return ''
       },
       submit() {
@@ -641,7 +651,8 @@
         this.submitting = true
         action(this.buildPayload()).then(() => {
           this.$modal.msgSuccess(this.submitText + '成功')
-          this.load()
+          this.profileDirty = false
+          this.load({ force: true })
         }).finally(() => {
           this.submitting = false
         })
@@ -662,60 +673,14 @@
     color: #17211b;
   }
 
-  .head-card,
   .warn-card,
-  .time-card,
   .form-card {
     border-radius: 14rpx;
     background: #fff;
     box-shadow: 0 8rpx 28rpx rgba(20, 35, 27, 0.06);
   }
 
-  .head-card {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 28rpx;
-    background: #6a3a2b;
-    color: #fff;
-  }
-
-  .sub {
-    color: rgba(255, 255, 255, 0.68);
-    font-size: 24rpx;
-  }
-
-  .title {
-    margin-top: 10rpx;
-    font-size: 36rpx;
-    font-weight: 700;
-  }
-
-  .chip {
-    padding: 8rpx 16rpx;
-    border-radius: 999rpx;
-    font-size: 24rpx;
-    background: #edf0ee;
-    color: #4e5a52;
-  }
-
-  .chip.ok {
-    background: #dcf4e1;
-    color: #176c35;
-  }
-
-  .chip.warn {
-    background: #fff0cb;
-    color: #875800;
-  }
-
-  .chip.danger {
-    background: #ffe0dc;
-    color: #a82819;
-  }
-
   .warn-card {
-    margin-top: 20rpx;
     padding: 24rpx;
     border-left: 8rpx solid #c1732d;
   }
@@ -735,11 +700,6 @@
   .form-card {
     margin-top: 22rpx;
     padding: 8rpx 26rpx 28rpx;
-  }
-
-  .time-card {
-    margin-top: 22rpx;
-    padding: 26rpx;
   }
 
   .section-head {
@@ -916,6 +876,12 @@
     font-size: 24rpx;
   }
 
+  .upload-placeholder {
+    width: 100%;
+    height: 100%;
+    text-align: center;
+  }
+
   .upload-plus {
     font-size: 42rpx;
     line-height: 1;
@@ -936,8 +902,11 @@
   }
 
   .gender-option {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8rpx;
     height: 76rpx;
-    line-height: 76rpx;
     border: 1rpx solid #e2e8e4;
     border-radius: 8rpx;
     background: #fbfcfb;
@@ -952,6 +921,10 @@
     background: #ecf7ef;
     color: #176c35;
     font-weight: 700;
+  }
+
+  .gender-radio {
+    transform: scale(.78);
   }
 
   .image-grid {
@@ -995,12 +968,70 @@
     height: 190rpx;
   }
 
+  .available-time-entry {
+    min-height: 92rpx;
+  }
+
+  .available-time-main {
+    display: flex;
+    flex: 1;
+    min-width: 0;
+    flex-direction: column;
+    gap: 8rpx;
+  }
+
+  .available-time-title,
+  .available-time-sub {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .available-time-title {
+    color: #17211b;
+    font-size: 28rpx;
+    font-weight: 600;
+  }
+
+  .available-time-sub {
+    color: #7b8780;
+    font-size: 24rpx;
+  }
+
+  .entry-arrow {
+    flex: 0 0 auto;
+    width: 16rpx;
+    height: 16rpx;
+    border-top: 3rpx solid #7b8780;
+    border-right: 3rpx solid #7b8780;
+    transform: rotate(45deg);
+  }
+
   .picker {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
     line-height: 40rpx;
   }
 
   .add-region {
     color: #2f8f55;
+  }
+
+  .picker-arrow {
+    width: 16rpx;
+    height: 16rpx;
+    border-top: 3rpx solid #2f8f55;
+    border-right: 3rpx solid #2f8f55;
+    transform: rotate(135deg);
+  }
+
+  .add-region.top .picker-arrow {
+    transform: rotate(-45deg);
+  }
+
+  .add-region.bottom .picker-arrow {
+    transform: rotate(135deg);
   }
 
   .area-list {
@@ -1027,6 +1058,50 @@
     color: #a82819;
     font-size: 30rpx;
     line-height: 1;
+  }
+
+  .image-preview-mask {
+    position: fixed;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    z-index: 999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 56rpx 32rpx;
+    box-sizing: border-box;
+    background: rgba(0, 0, 0, .78);
+  }
+
+  .image-preview-panel {
+    position: relative;
+    width: 100%;
+    height: 82vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .preview-close {
+    position: absolute;
+    top: 0;
+    right: 0;
+    z-index: 2;
+    width: 72rpx;
+    height: 72rpx;
+    line-height: 66rpx;
+    border-radius: 36rpx;
+    color: #fff;
+    text-align: center;
+    font-size: 48rpx;
+    background: rgba(0, 0, 0, .56);
+  }
+
+  .preview-image {
+    width: 100%;
+    height: 100%;
   }
 
   .submit {

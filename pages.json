@@ -28,7 +28,8 @@
   }, {
     "path": "pages/user/orders",
     "style": {
-      "navigationBarTitleText": "我的订单"
+      "navigationBarTitleText": "我的订单",
+      "enablePullDownRefresh": true
     }
   }, {
     "path": "pages/user/order-detail",
@@ -44,6 +45,11 @@
     "path": "pages/work/profile",
     "style": {
       "navigationBarTitleText": "入驻资料"
+    }
+  }, {
+    "path": "pages/work/profile-time",
+    "style": {
+      "navigationBarTitleText": "可预约时间"
     }
   }, {
     "path": "pages/work/orders",

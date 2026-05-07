@@ -189,6 +189,13 @@
         if (res.data && Array.isArray(res.data.list)) return res.data.list
         return []
       },
+      pickChefRating(item) {
+        const rating = item.rating
+        if (rating !== undefined && rating !== null && rating !== '') return rating
+        const score = item.score
+        if (score !== undefined && score !== null && score !== '') return score
+        return '5.0'
+      },
       normalizeChef(item) {
         const cuisines = this.toArray(item.cuisines || item.cuisine || item.specialties || item.goodAt)
         const areas = this.toArray(item.serviceAreas || item.serviceArea || item.serviceAreaNames || item.area)
@@ -196,7 +203,7 @@
           id: item.id || item.chefId || this.chefId,
           name: item.name || item.chefName || item.realName || '做饭人员',
           avatar: item.avatar || item.avatarUrl || item.photo || defaultAvatar,
-          rating: item.rating || item.score || '5.0',
+          rating: this.pickChefRating(item),
           completedCount: item.completedCount || item.completeCount || item.orderCount || item.finishedOrderCount || 0,
           cuisines,
           serviceAreaText: areas.length ? areas.join('、') : '服务区域待完善',

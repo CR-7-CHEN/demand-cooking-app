@@ -162,9 +162,9 @@ export function getChefSettlementMonth(params) {
   })
 }
 
-export function getCommissionAnnouncement(params) {
+export function getWorkbenchAnnouncements(params) {
   return request({
-    url: '/cooking/config/commission/announcement',
+    url: '/cooking/notice/announcement',
     method: 'get',
     params
   })

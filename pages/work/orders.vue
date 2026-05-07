@@ -58,9 +58,6 @@
           label: '待接单报价',
           value: 'response'
         }, {
-          label: '异议',
-          value: 'dispute'
-        }, {
           label: '待服务',
           value: 'service'
         }, {
@@ -69,6 +66,9 @@
         }, {
           label: '已完成',
           value: 'done'
+        }, {
+          label: '异议',
+          value: 'dispute'
         }]
       }
     },

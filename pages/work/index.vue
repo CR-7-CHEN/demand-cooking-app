@@ -5,26 +5,48 @@
         <view>
           <view class="title-row">
             <text class="chef-name">{{ chefName }}</text>
-            <text :class="['status-pill', statusTone]">{{ auditStatusText }}</text>
+            <text v-if="!needApply" :class="['status-pill', statusTone]">{{ auditStatusText }}</text>
           </view>
         </view>
         <image class="avatar" :src="chefAvatar" mode="aspectFill"></image>
       </view>
 
       <view v-if="isChefWorkbenchAvailable" class="notice-bar">
-        <text class="notice-icon">公告</text>
-        <swiper v-if="announcements.length" class="notice-swiper" vertical autoplay circular interval="3500">
-          <swiper-item v-for="(item, index) in announcements" :key="index">
-            <view class="notice-text">{{ item }}</view>
-          </swiper-item>
-        </swiper>
-        <view v-else class="notice-text">暂无抽佣调整公告</view>
+        <view class="notice-icon">
+          <uni-icons type="sound-filled" color="#f4c45f" :size="16"></uni-icons>
+        </view>
+        <uni-notice-bar
+          v-if="announcementText"
+          class="notice-marquee"
+          :text="announcementText"
+          :scrollable="true"
+          :single="true"
+          :show-icon="false"
+          background-color="transparent"
+          color="#fff7d1"
+          :speed="60"
+          :font-size="13"
+        />
+        <view v-else class="notice-empty">暂无公告</view>
       </view>
 
     </view>
 
     <view v-if="needApply" class="empty-card">
       <button class="primary-btn" @click="goProfile">申请入驻</button>
+    </view>
+
+    <view v-if="hasChefProfile && !isChefWorkbenchAvailable" class="quick-section">
+      <view class="quick-list">
+        <view class="quick-item" @click="goProfile">
+          <view class="quick-icon dark">资料</view>
+          <view class="quick-body">
+            <text class="quick-title">入驻资料</text>
+            <text class="quick-desc">查看已提交的审核资料，可进行修改</text>
+          </view>
+          <text class="arrow">›</text>
+        </view>
+      </view>
     </view>
 
     <view v-if="isChefWorkbenchAvailable" class="summary-grid">
@@ -49,10 +71,10 @@
     <view v-if="isChefWorkbenchAvailable" class="quick-section">
       <view class="quick-list">
         <view class="quick-item" @click="goProfile">
-          <view class="quick-icon dark">档</view>
+          <view class="quick-icon dark">资料</view>
           <view class="quick-body">
             <text class="quick-title">入驻与资料</text>
-            <text class="quick-desc">维护手机号、菜系、区域、健康证和作品图</text>
+            <text class="quick-desc">查看已提交的审核资料，可进行修改</text>
           </view>
           <text class="arrow">›</text>
         </view>
@@ -78,6 +100,24 @@
     <view v-if="canResign" class="resign-row">
       <button class="plain-danger" @click="handleResign">申请离职</button>
     </view>
+
+    <uni-popup ref="resignPopup" type="dialog" :is-mask-click="!resignSubmitting" @change="onResignPopupChange">
+      <view class="resign-dialog">
+        <view class="resign-dialog__title">申请离职</view>
+        <view class="resign-dialog__desc">请先处理完未完成订单，再提交离职申请</view>
+        <input
+          v-model.trim="resignReasonInput"
+          class="resign-dialog__input"
+          placeholder="请输入离职原因"
+          placeholder-class="resign-dialog__placeholder"
+          maxlength="500"
+        />
+        <view class="resign-dialog__actions">
+          <button class="resign-dialog__btn resign-dialog__btn--ghost" :disabled="resignSubmitting" @click="closeResignPopup">取消</button>
+          <button class="resign-dialog__btn resign-dialog__btn--danger" :loading="resignSubmitting" @click="submitResign">确认离职</button>
+        </view>
+      </view>
+    </uni-popup>
   </view>
 </template>
 
@@ -86,7 +126,7 @@
     getChefMy,
     resignChef,
     getChefOrderList,
-    getCommissionAnnouncement
+    getWorkbenchAnnouncements
   } from '@/api/cooking/chef'
   const chefStatus = require('@/utils/chef-status')
 
@@ -96,7 +136,9 @@
         loading: false,
         chef: {},
         orders: [],
-        announcements: []
+        announcements: [],
+        resignReasonInput: '',
+        resignSubmitting: false
       }
     },
     computed: {
@@ -108,6 +150,9 @@
       },
       needApply() {
         return chefStatus.needChefApply(this.chef)
+      },
+      hasChefProfile() {
+        return chefStatus.hasChefProfile(this.chef)
       },
       isChefWorkbenchAvailable() {
         return chefStatus.isChefWorkbenchAvailable(this.chef)
@@ -129,6 +174,9 @@
       },
       canResign() {
         return this.isChefWorkbenchAvailable
+      },
+      announcementText() {
+        return this.announcements.filter(Boolean).join('   |   ')
       },
       summary() {
         const now = new Date()
@@ -188,13 +236,10 @@
         })
       },
       loadAnnouncements() {
-        return getCommissionAnnouncement().then(res => {
+        return getWorkbenchAnnouncements().then(res => {
           const list = this.toList(res)
           if (list.length) {
-            this.announcements = list.map(item => {
-              if (typeof item === 'string') return item
-              return item.content || item.title || item.summary || item.remark || '平台抽佣公告'
-            })
+            this.announcements = list.map(item => this.formatAnnouncement(item))
           } else {
             const data = this.unwrap(res)
             this.announcements = data && typeof data === 'string' ? [data] : []
@@ -202,6 +247,25 @@
         }).catch(() => {
           this.announcements = []
         })
+      },
+      formatAnnouncement(item) {
+        if (typeof item === 'string') return item
+        const noticeContent = this.normalizeAnnouncementText(item.noticeContent)
+        if (noticeContent) return noticeContent
+        const announcementContent = this.normalizeAnnouncementText(item.announcementContent)
+        if (announcementContent) return announcementContent
+        const content = this.normalizeAnnouncementText(item.content || item.summary || item.remark)
+        if (content) return content
+        const noticeTitle = this.normalizeAnnouncementText(item.noticeTitle)
+        if (noticeTitle) return noticeTitle
+        return this.normalizeAnnouncementText(item.title) || '平台公告'
+      },
+      normalizeAnnouncementText(value) {
+        return String(value || '')
+          .replace(/<[^>]+>/g, ' ')
+          .replace(/&nbsp;/gi, ' ')
+          .replace(/\s+/g, ' ')
+          .trim()
       },
       unwrap(res) {
         if (!res) return null
@@ -239,7 +303,21 @@
         return `${date.getFullYear()}-${month < 10 ? '0' + month : month}`
       },
       goProfile() {
-        this.$tab.navigateTo('/pages/work/profile')
+        if (this.needApply) {
+          uni.showModal({
+            title: '入驻确认',
+            content: '是否入驻成为做饭人员？',
+            cancelText: '否',
+            confirmText: '是',
+            success: (res) => {
+              if (res.confirm) {
+                this.$tab.navigateTo('/pages/work/profile')
+              }
+            }
+          })
+        } else {
+          this.$tab.navigateTo('/pages/work/profile')
+        }
       },
       goOrders() {
         this.$tab.navigateTo('/pages/work/orders')
@@ -248,11 +326,35 @@
         this.$tab.navigateTo('/pages/work/settlement')
       },
       handleResign() {
-        this.$modal.confirm('离职申请提交后将由平台处理，未完成订单会被拦截，确认提交吗？').then(() => {
-          resignChef({}).then(() => {
-            this.$modal.msgSuccess('离职申请已提交')
-            this.loadChef()
-          })
+        if (!this.$refs.resignPopup) return
+        this.$refs.resignPopup.open()
+      },
+      onResignPopupChange(event) {
+        const detail = event && event.detail ? event.detail : {}
+        if (!detail.show && !this.resignSubmitting) {
+          this.resignReasonInput = ''
+        }
+      },
+      closeResignPopup() {
+        if (this.resignSubmitting || !this.$refs.resignPopup) return
+        this.$refs.resignPopup.close()
+      },
+      submitResign() {
+        const resignReason = String(this.resignReasonInput || '').trim()
+        if (!resignReason) {
+          this.$modal.msg('请输入离职原因')
+          return
+        }
+        this.resignSubmitting = true
+        resignChef({ resignReason }).then(() => {
+          this.$modal.msgSuccess('离职申请已提交')
+          this.resignReasonInput = ''
+          if (this.$refs.resignPopup) {
+            this.$refs.resignPopup.close()
+          }
+          this.loadChef()
+        }).finally(() => {
+          this.resignSubmitting = false
         })
       }
     }
@@ -335,36 +437,49 @@
   .notice-bar {
     display: flex;
     align-items: center;
-    margin-top: 28rpx;
-    padding: 18rpx 20rpx;
-    border-radius: 10rpx;
-    background: rgba(255, 255, 255, 0.1);
+    margin-top: 20rpx;
+    padding: 10rpx 16rpx;
+    border-radius: 8rpx;
+    background: rgba(255, 255, 255, 0.08);
   }
 
   .notice-icon {
     flex: 0 0 auto;
-    padding: 4rpx 10rpx;
-    border-radius: 6rpx;
-    background: #f4c45f;
-    color: #241a06;
-    font-size: 22rpx;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 34rpx;
+    height: 34rpx;
   }
 
-  .notice-swiper {
+  .notice-marquee,
+  .notice-empty {
     flex: 1;
-    height: 42rpx;
-    margin-left: 14rpx;
+    margin-left: 10rpx;
   }
 
-  .notice-text {
-    flex: 1;
-    margin-left: 14rpx;
-    color: rgba(255, 255, 255, 0.86);
+  .notice-empty {
+    color: #fff7d1;
     font-size: 24rpx;
-    line-height: 42rpx;
+    font-weight: 600;
+    line-height: 36rpx;
+  }
+
+  :deep(.notice-marquee.uni-noticebar) {
+    padding: 0;
+    min-height: 36rpx;
+  }
+
+  :deep(.notice-marquee .uni-noticebar__content-wrapper) {
+    height: 36rpx !important;
+  }
+
+  :deep(.notice-marquee .uni-noticebar__content-text) {
     overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    font-weight: 700;
+    letter-spacing: 0;
+    line-height: 36rpx !important;
+    text-shadow: 0 2rpx 6rpx rgba(0, 0, 0, 0.14);
   }
 
   .primary-btn {
@@ -518,5 +633,70 @@
     background: #fff;
     color: #a82819;
     font-size: 28rpx;
+  }
+
+  .resign-dialog {
+    width: 620rpx;
+    padding: 36rpx 32rpx 28rpx;
+    border-radius: 16rpx;
+    background: #fff;
+    box-sizing: border-box;
+  }
+
+  .resign-dialog__title {
+    color: #17211b;
+    font-size: 36rpx;
+    font-weight: 700;
+    text-align: center;
+  }
+
+  .resign-dialog__desc {
+    margin-top: 18rpx;
+    color: #66756b;
+    font-size: 28rpx;
+    line-height: 1.6;
+  }
+
+  .resign-dialog__input {
+    width: 100%;
+    height: 76rpx;
+    margin-top: 22rpx;
+    padding: 0 20rpx;
+    border: 1rpx solid #e2e8e4;
+    border-radius: 8rpx;
+    box-sizing: border-box;
+    color: #17211b;
+    font-size: 24rpx;
+    background: #fbfcfb;
+  }
+
+  .resign-dialog__placeholder {
+    color: #98a29b;
+    font-size: 22rpx;
+  }
+
+  .resign-dialog__actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18rpx;
+    margin-top: 26rpx;
+  }
+
+  .resign-dialog__btn {
+    height: 76rpx;
+    line-height: 76rpx;
+    border-radius: 8rpx;
+    font-size: 28rpx;
+  }
+
+  .resign-dialog__btn--ghost {
+    background: #fff;
+    color: #5f6d64;
+    border: 1rpx solid #d7dfda;
+  }
+
+  .resign-dialog__btn--danger {
+    background: #a82819;
+    color: #fff;
   }
 </style>

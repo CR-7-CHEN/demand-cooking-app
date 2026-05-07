@@ -1,0 +1,20 @@
+const test = require('node:test')
+const assert = require('node:assert/strict')
+const fs = require('node:fs')
+const path = require('node:path')
+
+const apiSource = fs.readFileSync(path.join(__dirname, '..', 'api', 'cooking', 'chef.js'), 'utf8')
+const pageSource = fs.readFileSync(path.join(__dirname, '..', 'pages', 'work', 'index.vue'), 'utf8')
+
+test('workbench announcements use system notices instead of business config announcements', () => {
+  assert.match(apiSource, /\/cooking\/notice\/announcement/)
+  assert.doesNotMatch(apiSource, /\/cooking\/config\/commission\/announcement/)
+  assert.match(pageSource, /uni-notice-bar/)
+  assert.match(pageSource, /sound-filled/)
+  assert.match(pageSource, /noticeContent/)
+  assert.match(pageSource, /announcementContent/)
+  assert.match(pageSource, /announcementText\(\)/)
+  assert.doesNotMatch(pageSource, /<text class="notice-icon">公告<\/text>/)
+  assert.doesNotMatch(pageSource, /抽佣/)
+  assert.match(pageSource, /暂无公告/)
+})

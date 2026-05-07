@@ -31,6 +31,17 @@
           </picker>
           <button @click="loadChefs">筛选</button>
         </view>
+        <view class="meal-period-row">
+          <text
+            v-for="item in mealPeriodOptions"
+            :key="item.value"
+            class="meal-period-option"
+            :class="{ active: query.mealPeriod === item.value }"
+            @click="selectMealPeriod(item.value)"
+          >
+            {{ item.label }}
+          </text>
+        </view>
       </view>
     </view>
 
@@ -86,9 +97,9 @@
 
       <view class="dashboard-card alerts-card">
         <view class="dashboard-head inner">
-          <text class="dashboard-title">异常提醒</text>
+          <text class="dashboard-title">工作提醒</text>
         </view>
-        <view v-if="limitedAlerts.length === 0" class="empty-alert">暂无异常提醒</view>
+        <view v-if="limitedAlerts.length === 0" class="empty-alert">暂无工作提醒</view>
         <view v-else class="alert-list">
           <view v-for="item in limitedAlerts" :key="item.key || item.title" class="alert-item" :class="alertToneClass(item.tone)">
             <view class="alert-main">
@@ -133,6 +144,8 @@
             <view v-if="chef.recommended" class="recommend-tag">推荐</view>
           </view>
           <view class="meta-row">
+            <text v-if="chef.genderText">{{ chef.genderText }}</text>
+            <text v-if="chef.ageText">{{ chef.ageText }}</text>
             <text>评分 {{ chef.rating }}</text>
             <text>{{ chef.completedCount }} 单</text>
           </view>
@@ -157,6 +170,11 @@
   const chefStatus = require('@/utils/chef-status')
 
   const defaultAvatar = '/static/images/profile.jpg'
+  const mealPeriodOptions = [
+    { label: '早餐', value: 'breakfast' },
+    { label: '午餐', value: 'lunch' },
+    { label: '晚餐', value: 'dinner' }
+  ]
 
   export default {
     data() {
@@ -164,8 +182,10 @@
         loading: false,
         query: {
           keyword: '',
-          serviceArea: ''
+          serviceArea: '',
+          mealPeriod: ''
         },
+        mealPeriodOptions,
         serviceAreaLabel: '',
         regionValue: [],
         regionIndex: [0, 0, 0],
@@ -273,7 +293,8 @@
         this.loading = true
         listChefs({
           keyword: this.query.keyword,
-          serviceArea: this.query.serviceArea
+          serviceArea: this.query.serviceArea,
+          mealPeriod: this.query.mealPeriod
         }).then(res => {
           this.chefs = this.pickList(res).map(this.normalizeChef)
         }).catch(() => {
@@ -281,6 +302,10 @@
         }).finally(() => {
           this.loading = false
         })
+      },
+      selectMealPeriod(value) {
+        this.query.mealPeriod = this.query.mealPeriod === value ? '' : value
+        this.loadChefs()
       },
       unwrap(res) {
         if (!res) return null
@@ -369,20 +394,64 @@
         if (res.data && Array.isArray(res.data.list)) return res.data.list
         return []
       },
+      pickChefRating(item) {
+        const rating = item.rating
+        if (rating !== undefined && rating !== null && rating !== '') return rating
+        const score = item.score
+        if (score !== undefined && score !== null && score !== '') return score
+        return '5.0'
+      },
+      formatChefRating(value) {
+        const rating = Number(value)
+        if (Number.isFinite(rating)) {
+          return rating.toFixed(1)
+        }
+        return value
+      },
       normalizeChef(item) {
         const cuisines = this.toArray(item.cuisines || item.cuisine || item.specialties || item.goodAt)
         const areas = this.toArray(item.serviceAreas || item.serviceArea || item.serviceAreaNames || item.area)
+        const rawGender = item.gender === undefined || item.gender === null ? item.sex : item.gender
+        const rawAge = item.age === undefined || item.age === null ? (item.ageText === undefined || item.ageText === null ? item.ageValue : item.ageText) : item.age
         return {
           raw: item,
           id: item.id || item.chefId || item.userChefId,
           name: item.name || item.chefName || item.realName || '做饭人员',
           avatar: item.avatar || item.avatarUrl || item.photo || defaultAvatar,
-          rating: item.rating || item.score || '5.0',
-          completedCount: item.completedCount || item.completeCount || item.orderCount || item.finishedOrderCount || 0,
+          rating: this.formatChefRating(this.pickChefRating(item)),
+          completedCount: item.completedCount || item.completeCount || item.orderCount || item.finishedOrderCount || item.completedOrders || 0,
+          genderText: this.formatChefGender(rawGender),
+          ageText: this.formatChefAge(rawAge),
           cuisines,
           serviceAreaText: areas.length ? areas.join('、') : '服务区域待完善',
-          recommended: item.recommended || item.recommendFlag || item.isRecommended
+          recommended: this.isRecommendedChef(item.recommended, item.recommendFlag, item.isRecommended)
         }
+      },
+      formatChefGender(value) {
+        const text = String(value === undefined || value === null ? '' : value).trim()
+        if (!text) return ''
+        const normalized = text.toLowerCase()
+        if (['0', 'male', 'man', 'm', '男'].includes(normalized) || text === '男') return '男'
+        if (['1', 'female', 'woman', 'f', '女'].includes(normalized) || text === '女') return '女'
+        if (['2', 'other', 'unknown', '其他', '未知'].includes(normalized) || text === '其他' || text === '未知') return '其他'
+        return text
+      },
+      formatChefAge(value) {
+        if (value === undefined || value === null || value === '') return ''
+        const age = Number(value)
+        if (Number.isFinite(age) && age > 0) {
+          return `${Math.round(age)}岁`
+        }
+        const text = String(value).trim()
+        if (!text) return ''
+        return text.endsWith('岁') ? text : `${text}岁`
+      },
+      isRecommendedChef(...values) {
+        return values.some(value => {
+          if (value === true || value === 1) return true
+          const text = String(value === undefined || value === null ? '' : value).trim().toLowerCase()
+          return ['1', 'true', 'y', 'yes'].includes(text)
+        })
       },
       toArray(value) {
         if (!value) return []
@@ -421,8 +490,25 @@
       },
       toggleTakingOrders() {
         if (this.statusSwitching) return
-        this.statusSwitching = true
         const wasTakingOrders = this.isTakingOrders
+        if (wasTakingOrders) {
+          uni.showModal({
+            title: '暂停接单',
+            content: '暂停后将不会收到新的预约订单，确认暂停吗？',
+            cancelText: '取消',
+            confirmText: '确认暂停',
+            success: (res) => {
+              if (res.confirm) {
+                this.doToggle(wasTakingOrders)
+              }
+            }
+          })
+        } else {
+          this.doToggle(wasTakingOrders)
+        }
+      },
+      doToggle(wasTakingOrders) {
+        this.statusSwitching = true
         const action = wasTakingOrders ? pauseChef : resumeChef
         action({}).then(() => {
           this.$modal.msg(wasTakingOrders ? '已暂停接单' : '已恢复接单')
@@ -520,6 +606,13 @@
     padding-top: 18rpx;
   }
 
+  .meal-period-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12rpx;
+    padding-top: 18rpx;
+  }
+
   .region-picker {
     min-width: 0;
     flex: 1;
@@ -556,6 +649,23 @@
     color: #fff;
     font-size: 26rpx;
     background: #f06a3a;
+  }
+
+  .meal-period-option {
+    min-width: 112rpx;
+    height: 52rpx;
+    line-height: 52rpx;
+    padding: 0 20rpx;
+    border-radius: 8rpx;
+    color: #7b8580;
+    text-align: center;
+    font-size: 24rpx;
+    background: #f6efe8;
+  }
+
+  .meal-period-option.active {
+    color: #f06a3a;
+    background: #fff0e8;
   }
 
   .quick-actions {
