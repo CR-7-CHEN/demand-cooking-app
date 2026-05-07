@@ -154,6 +154,13 @@ export function cancelChefOrder(data) {
 }
 
 // 结算与公告
+export function getChefSettlementDetail(id) {
+  return request({
+    url: `/cooking/settlement/${id}`,
+    method: 'get'
+  })
+}
+
 export function getChefSettlementMonth(params) {
   return request({
     url: '/cooking/settlement/chef/month',

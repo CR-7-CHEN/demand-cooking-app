@@ -7,7 +7,7 @@
           <view v-if="!avatar" @click="handleToAvatar" class="cu-avatar xl round bg-white">
             <view class="iconfont icon-people text-gray icon"></view>
           </view>
-          <image v-if="avatar" @click="handleToAvatar" :src="avatar" class="cu-avatar xl round" mode="widthFix">
+          <image v-if="avatar" @click="handleToAvatar" :src="avatar" class="cu-avatar xl round user-avatar" mode="aspectFit">
           </image>
           <view v-if="!name" @click="handleToLogin" class="login-tip">
             点击登录
@@ -147,10 +147,15 @@
 
       .cu-avatar {
         border: 2px solid #eaeaea;
+        background-color: rgba(255, 255, 255, 0.92);
 
         .icon {
           font-size: 40px;
         }
+      }
+
+      .user-avatar {
+        background-color: rgba(255, 255, 255, 0.92);
       }
 
       .user-info {

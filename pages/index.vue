@@ -6,6 +6,16 @@
           <view class="title">把一餐家常饭交给可靠的人</view>
         </view>
       </view>
+      <view v-if="!isCurrentChef" class="quick-actions hero-actions">
+        <view class="quick-item" @click="goAddress">
+          <uni-icons type="location-filled" size="24" color="#f06a3a"></uni-icons>
+          <text>地址管理</text>
+        </view>
+        <view class="quick-item" @click="goOrders">
+          <uni-icons type="calendar-filled" size="24" color="#20a779"></uni-icons>
+          <text>我的订单</text>
+        </view>
+      </view>
       <view v-if="showChefRecommendations" class="search-panel">
         <view class="search-row">
           <uni-icons type="search" size="18" color="#f06a3a"></uni-icons>
@@ -45,27 +55,11 @@
       </view>
     </view>
 
-    <view class="quick-actions" :class="{ 'chef-actions': isCurrentChef }">
-      <view v-if="!isCurrentChef" class="quick-item" @click="goAddress">
-        <uni-icons type="location-filled" size="24" color="#f06a3a"></uni-icons>
-        <text>地址管理</text>
-      </view>
-      <view class="quick-item" @click="goOrders">
-        <uni-icons type="calendar-filled" size="24" color="#20a779"></uni-icons>
-        <text>我的订单</text>
-      </view>
-      <view v-if="showChefRecommendations" class="quick-item" @click="loadChefs">
-        <uni-icons type="refresh" size="24" color="#2f7d58"></uni-icons>
-        <text>刷新推荐</text>
-      </view>
-    </view>
-
     <view v-if="isCurrentChef" class="chef-dashboard">
       <view class="dashboard-card status-card">
         <view>
           <view class="status-label">接单状态</view>
           <view class="status-title">{{ isTakingOrders ? '营业中' : '暂停中' }}</view>
-          <view class="status-desc">{{ isTakingOrders ? '当前可接收新的预约订单' : '当前不会收到新的预约订单' }}</view>
         </view>
         <button
           class="status-button"
@@ -80,6 +74,7 @@
 
       <view class="dashboard-head">
         <text class="dashboard-title">收益概览</text>
+        <text class="dashboard-link" @click="goOrders">我的订单 ></text>
       </view>
       <view class="revenue-grid">
         <view
@@ -101,7 +96,7 @@
         </view>
         <view v-if="limitedAlerts.length === 0" class="empty-alert">暂无工作提醒</view>
         <view v-else class="alert-list">
-          <view v-for="item in limitedAlerts" :key="item.key || item.title" class="alert-item" :class="alertToneClass(item.tone)">
+          <view v-for="item in limitedAlerts" :key="item.key || item.title" class="alert-item" :class="item._toneClass">
             <view class="alert-main">
               <view class="alert-title">{{ item.title }}</view>
               <view class="alert-content">{{ item.content }}</view>
@@ -120,7 +115,7 @@
           <view v-for="item in revenueTrend" :key="item.date || item.label" class="trend-item">
             <text class="trend-label">{{ item.label || item.date }}</text>
             <view class="trend-track">
-              <view class="trend-bar" :style="getTrendStyle(item)"></view>
+              <view class="trend-bar" :style="item._barStyle"></view>
             </view>
             <text class="trend-amount">{{ formatMoney(item.amount) }}</text>
           </view>
@@ -152,7 +147,7 @@
           <view class="tag-row">
             <text v-for="item in chef.cuisines" :key="item" class="tag">{{ item }}</text>
           </view>
-          <view class="area-row">
+          <view v-if="chef.serviceAreaText" class="area-row">
             <uni-icons type="location" size="14" color="#8a8f98"></uni-icons>
             <text>{{ chef.serviceAreaText }}</text>
           </view>
@@ -233,16 +228,28 @@
       },
       limitedAlerts() {
         const alerts = Array.isArray(this.chefWorkbench.alerts) ? this.chefWorkbench.alerts : []
-        return alerts.slice(0, 3)
+        return alerts.slice(0, 3).map(item => {
+          const tone = String(item.tone || '').toLowerCase()
+          let cls = 'warning'
+          if (tone === 'danger' || tone === 'error') cls = 'danger'
+          else if (tone === 'success') cls = 'success'
+          return { ...item, _toneClass: cls }
+        })
       },
       revenueTrend() {
-        return Array.isArray(this.chefWorkbench.revenueTrend) ? this.chefWorkbench.revenueTrend : []
-      },
-      maxTrendAmount() {
-        return this.revenueTrend.reduce((max, item) => {
+        const trend = Array.isArray(this.chefWorkbench.revenueTrend) ? this.chefWorkbench.revenueTrend : []
+        const maxTrendAmount = trend.reduce((max, item) => {
           const amount = Number(item.amount) || 0
           return amount > max ? amount : max
         }, 0)
+        return trend.map(item => {
+          const amount = Number(item.amount) || 0
+          const percent = amount > 0 && maxTrendAmount > 0 ? Math.max(8, Math.round((amount / maxTrendAmount) * 100)) : 0
+          return {
+            ...item,
+            _barStyle: `width: ${percent}%;`
+          }
+        })
       }
     },
     onLoad() {
@@ -423,7 +430,7 @@
           genderText: this.formatChefGender(rawGender),
           ageText: this.formatChefAge(rawAge),
           cuisines,
-          serviceAreaText: areas.length ? areas.join('、') : '服务区域待完善',
+          serviceAreaText: areas.length ? areas.join('、') : '',
           recommended: this.isRecommendedChef(item.recommended, item.recommendFlag, item.isRecommended)
         }
       },
@@ -473,11 +480,6 @@
         if (value === 'danger' || value === 'error') return 'danger'
         if (value === 'success') return 'success'
         return 'warning'
-      },
-      getTrendStyle(item) {
-        const amount = Number(item.amount) || 0
-        const percent = amount > 0 && this.maxTrendAmount > 0 ? Math.max(8, Math.round((amount / this.maxTrendAmount) * 100)) : 0
-        return `width: ${percent}%;`
       },
       onRevenueCardTap(item) {
         if (item && item.action === 'commission') {
@@ -675,6 +677,18 @@
     padding: 24rpx 32rpx 8rpx;
   }
 
+  .hero-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 20rpx;
+    padding: 30rpx 0 6rpx;
+  }
+
+  .hero-actions .quick-item {
+    height: 124rpx;
+    background: rgba(255, 255, 255, .92);
+    box-shadow: 0 10rpx 24rpx rgba(114, 59, 24, .12);
+  }
+
   .quick-item {
     height: 122rpx;
     display: flex;
@@ -688,17 +702,6 @@
     font-size: 24rpx;
   }
 
-  .quick-actions.chef-actions {
-    grid-template-columns: 1fr;
-  }
-
-  .quick-actions.chef-actions .quick-item {
-    height: 104rpx;
-    flex-direction: row;
-    gap: 16rpx;
-    font-size: 28rpx;
-    font-weight: 600;
-  }
 
   .chef-dashboard {
     padding: 22rpx 32rpx 4rpx;
@@ -732,11 +735,6 @@
     font-weight: 700;
   }
 
-  .status-desc {
-    margin-top: 8rpx;
-    color: #8d684e;
-    font-size: 24rpx;
-  }
 
   .status-button {
     width: 176rpx;
@@ -769,6 +767,11 @@
     color: #1d2b26;
     font-size: 32rpx;
     font-weight: 700;
+  }
+
+  .dashboard-link {
+    color: #f06a3a;
+    font-size: 26rpx;
   }
 
   .revenue-grid {
@@ -923,14 +926,14 @@
   }
 
   .section-head {
-    padding: 28rpx 32rpx 12rpx;
+    padding: 32rpx 32rpx 16rpx;
     text-align: center;
   }
 
   .section-title {
     display: block;
     color: #1d2b26;
-    font-size: 34rpx;
+    font-size: 32rpx;
     font-weight: 700;
   }
 

@@ -116,7 +116,7 @@
 				var _this = this
 				uni.chooseImage({
 					count: 1,
-					sizeType: ['compressed'],
+					sizeType: ['original'],
 					sourceType: ['album', 'camera'],
 					success: function (res) {
 						const filePath = _this.getChosenFilePath(res)
@@ -149,7 +149,7 @@
 				uni.getImageInfo({
 					src: _this.imageSrc,
 					success: function success(res) {
-						IMG_RATIO = 1 / 1
+						IMG_RATIO = res && res.width && res.height ? res.width / res.height : 1
 						if (IMG_RATIO >= 1) {
 							IMG_REAL_W = SCREEN_WIDTH
 							IMG_REAL_H = SCREEN_WIDTH / IMG_RATIO

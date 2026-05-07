@@ -67,6 +67,11 @@
       "navigationBarTitleText": "月度结算"
     }
   }, {
+    "path": "pages/work/settlement-detail",
+    "style": {
+      "navigationBarTitleText": "结算详情"
+    }
+  }, {
     "path": "pages/work/commission",
     "style": {
       "navigationBarTitleText": "本月提成"

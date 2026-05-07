@@ -5,7 +5,7 @@
         <view class="avatar-row" @click="handleToAvatar">
           <view class="avatar-label">用户头像</view>
           <view class="avatar-value">
-            <image class="avatar" :src="avatar" mode="aspectFill"></image>
+            <image class="avatar" :src="avatar" mode="aspectFit"></image>
             <view class="iconfont icon-right"></view>
           </view>
         </view>
@@ -118,6 +118,7 @@
     height: 72rpx;
     border-radius: 50%;
     margin-right: 12rpx;
+    background-color: rgba(240, 106, 58, 0.08);
   }
 
   .segmented-control {

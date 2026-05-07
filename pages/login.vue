@@ -124,7 +124,6 @@
           // #endif
         })
       },
-      // 登录成功后，处理函数
       handleWxLogin() {
         // #ifndef MP-WEIXIN
         this.$modal.msgError('请在微信小程序环境中使用微信快捷登录')

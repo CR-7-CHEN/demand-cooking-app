@@ -10,8 +10,7 @@ export function login(username, password, loginInfo = {}) {
     xcxCode: loginInfo.xcxCode,
     appid: loginInfo.appid,
     clientId,
-    grantType: 'password',
-    tenantId: appConfig.tenantId
+    grantType: 'password'
   }
   return request({
     'url': '/auth/app/login',
@@ -33,8 +32,7 @@ export function wxLogin(loginInfo) {
     xcxCode,
     appid,
     clientId,
-    grantType: 'xcx',
-    tenantId: appConfig.tenantId
+    grantType: 'xcx'
   }
   return request({
     url: '/auth/app/login',
@@ -54,7 +52,6 @@ export function register(data) {
     ...data,
     clientId,
     grantType: 'password',
-    tenantId: appConfig.tenantId,
     userType: 'app_user'
   }
   return request({

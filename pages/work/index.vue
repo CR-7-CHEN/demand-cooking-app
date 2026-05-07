@@ -465,16 +465,16 @@
     line-height: 36rpx;
   }
 
-  :deep(.notice-marquee.uni-noticebar) {
+  ::v-deep .notice-marquee.uni-noticebar {
     padding: 0;
     min-height: 36rpx;
   }
 
-  :deep(.notice-marquee .uni-noticebar__content-wrapper) {
+  ::v-deep .notice-marquee .uni-noticebar__content-wrapper {
     height: 36rpx !important;
   }
 
-  :deep(.notice-marquee .uni-noticebar__content-text) {
+  ::v-deep .notice-marquee .uni-noticebar__content-text {
     overflow: hidden;
     font-weight: 700;
     letter-spacing: 0;
