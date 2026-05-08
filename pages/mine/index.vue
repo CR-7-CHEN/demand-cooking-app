@@ -43,15 +43,6 @@
             <view>编辑资料</view>
           </view>
         </view>
-        <view v-if="chefEntry" class="list-cell list-cell-arrow" @click="handleChefEntry">
-          <view class="menu-item-box">
-            <view class="iconfont icon-people menu-icon"></view>
-            <view class="chef-entry-box">
-              <view>{{ chefEntry.title }}</view>
-              <view class="chef-entry-desc">{{ chefEntry.description }}</view>
-            </view>
-          </view>
-        </view>
         <view class="list-cell list-cell-arrow" @click="handleHelp">
           <view class="menu-item-box">
             <view class="iconfont icon-help menu-icon"></view>
@@ -70,6 +61,15 @@
             <view>应用设置</view>
           </view>
         </view>
+      </view>
+
+      <view v-if="chefAction" class="chef-action-card">
+        <view class="chef-action-main">
+          <view class="chef-action-label">做饭人员入驻</view>
+          <view class="chef-action-title">{{ chefAction.title }}</view>
+          <view class="chef-action-desc">{{ chefAction.description }}</view>
+        </view>
+        <button class="chef-action-button" @click="handleChefAction">{{ chefAction.buttonText }}</button>
       </view>
 
     </view>
@@ -98,9 +98,9 @@
       avatar() {
         return this.$store.state.user.avatar
       },
-      chefEntry() {
+      chefAction() {
         if (!this.$store.state.user.token) return null
-        return this.resolveChefEntry(this.chef)
+        return this.resolveChefAction(this.chef)
       },
       windowHeight() {
         return uni.getSystemInfoSync().windowHeight - 50
@@ -128,12 +128,24 @@
       handleAbout() {
         this.$tab.navigateTo('/pages/mine/about/index')
       },
-      handleChefEntry() {
+      handleChefAction() {
         if (!this.$store.state.user.token) {
           this.handleToLogin()
           return
         }
-        this.$tab.navigateTo('/pages/work/profile')
+        const action = this.resolveChefAction(this.chef)
+        if (!action) return
+        uni.showModal({
+          title: action.dialogTitle,
+          content: action.dialogContent,
+          confirmText: '前往',
+          cancelText: '稍后',
+          success: ({ confirm }) => {
+            if (confirm) {
+              this.$tab.navigateTo('/pages/work/profile')
+            }
+          }
+        })
       },
       getProfile() {
         if (!this.$store.state.user.token) return
@@ -153,35 +165,50 @@
           this.chef = {}
         })
       },
-      resolveChefEntry(chef) {
+      resolveChefAction(chef) {
         if (chefStatus.isChefWorkbenchAvailable(chef)) return null
         if (chefStatus.needChefApply(chef)) {
           return {
-            title: '申请成为做饭人员',
-            description: '提交做饭人员资料并等待审核'
+            title: '申请入驻',
+            description: '平台审核通过即可接单',
+            buttonText: '申请入驻',
+            dialogTitle: '申请入驻',
+            dialogContent: '需要填写头像、服务区域、健康证、作品图和可预约时间，确认后将进入入驻资料页。'
           }
         }
         if (chefStatus.isChefPending(chef)) {
           return {
-            title: '查看申请进度',
-            description: '审核中，可查看已提交的做饭人员资料'
+            title: '申请审核中',
+            description: '资料已提交，可查看当前进度和已填写内容',
+            buttonText: '查看进度',
+            dialogTitle: '查看申请进度',
+            dialogContent: '当前入驻申请正在审核中，可先查看已提交资料和审核状态。'
           }
         }
         if (chefStatus.isChefRejected(chef)) {
           return {
-            title: '完善做饭人员资料',
-            description: '根据驳回原因修改资料后重新提交'
+            title: '入驻资料待完善',
+            description: '根据驳回原因补充资料后重新提交审核',
+            buttonText: '完善资料',
+            dialogTitle: '完善入驻资料',
+            dialogContent: '请根据驳回原因完善资料，确认后前往资料页继续提交。'
           }
         }
         if (chefStatus.hasChefProfile(chef)) {
           return {
-            title: '查看做饭人员资料',
-            description: '工作台暂不可用，可查看或完善入驻资料'
+            title: '查看入驻资料',
+            description: '当前账号已有入驻资料，可继续查看或补充完善',
+            buttonText: '查看资料',
+            dialogTitle: '查看入驻资料',
+            dialogContent: '可查看当前入驻资料和状态说明，确认后前往资料页。'
           }
         }
         return {
-          title: '申请成为做饭人员',
-          description: '提交做饭人员资料并等待审核'
+          title: '申请入驻',
+          description: '平台审核通过即可接单',
+          buttonText: '申请入驻',
+          dialogTitle: '申请入驻',
+          dialogContent: '需要填写头像、服务区域、健康证、作品图和可预约时间，确认后将进入入驻资料页。'
         }
       },
       handleBuilding() {
@@ -263,15 +290,58 @@
         }
       }
 
-      .chef-entry-box {
+      .chef-action-card {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin: 15px 15px 0;
+        padding: 18px 16px;
+        border-radius: 14px;
+        background: linear-gradient(135deg, #fff1e4 0%, #ffe4d1 100%);
+        box-shadow: 0 12px 28px rgba(240, 106, 58, 0.12);
+      }
+
+      .chef-action-main {
         display: flex;
         flex-direction: column;
       }
 
-      .chef-entry-desc {
+      .chef-action-label {
+        font-size: 12px;
+        color: #c77445;
+      }
+
+      .chef-action-title {
+        margin-top: 6px;
+        font-size: 18px;
+        font-weight: 600;
+        color: #7a3b1b;
+      }
+
+      .chef-action-desc {
         margin-top: 4px;
         font-size: 12px;
-        color: #8a8a8a;
+        line-height: 18px;
+        color: #9a6a4a;
+      }
+
+      .chef-action-button {
+        margin: 0 0 0 14px;
+        padding: 0 18px;
+        min-width: 108px;
+        height: 40px;
+        line-height: 40px;
+        border: none;
+        border-radius: 999px;
+        background: #f06a3a;
+        color: #fff;
+        font-size: 14px;
+        font-weight: 600;
+        box-shadow: 0 10px 20px rgba(240, 106, 58, 0.18);
+      }
+
+      .chef-action-button::after {
+        border: none;
       }
     }
   }

@@ -169,6 +169,22 @@ export function getChefSettlementMonth(params) {
   })
 }
 
+export function submitChefSettlementReview(data) {
+  return request({
+    url: '/cooking/settlement/chef/review',
+    method: 'post',
+    data
+  })
+}
+
+export function confirmChefSettlement(data) {
+  return request({
+    url: '/cooking/settlement/chef/confirm',
+    method: 'post',
+    data
+  })
+}
+
 export function getWorkbenchAnnouncements(params) {
   return request({
     url: '/cooking/notice/announcement',

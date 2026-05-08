@@ -6,6 +6,12 @@ const vm = require('node:vm')
 
 const pagePath = path.join(__dirname, '..', 'pages', 'mine', 'index.vue')
 const source = fs.readFileSync(pagePath, 'utf8')
+const uniMock = {
+  showModal() {},
+  getSystemInfoSync() {
+    return { windowHeight: 800 }
+  }
+}
 
 function loadComponentOptions() {
   const match = source.match(/<script>([\s\S]*?)<\/script>/)
@@ -23,11 +29,7 @@ function loadComponentOptions() {
     require,
     console,
     Promise,
-    uni: {
-      getSystemInfoSync() {
-        return { windowHeight: 800 }
-      }
-    }
+    uni: uniMock
   }
 
   vm.runInNewContext(script, sandbox, { filename: pagePath })
@@ -59,17 +61,50 @@ function createPageContext(component, overrides = {}) {
   return ctx
 }
 
-test('mine page resolves chef entry copy from chef status and hides it for active workbench chefs', () => {
+test('mine page uses a dedicated apply card and hides workbench copy for ordinary users', () => {
+  assert.doesNotMatch(source, /v-if="chefEntry" class="list-cell/)
+  assert.match(source, /v-if="chefAction" class="chef-action-card"/)
+  assert.match(source, /uni\.showModal\(/)
+
   const component = loadComponentOptions()
   const ctx = createPageContext(component)
 
-  const pendingEntry = component.methods.resolveChefEntry.call(ctx, { chefId: '1', auditStatus: '0' })
-  const rejectedEntry = component.methods.resolveChefEntry.call(ctx, { chefId: '1', auditStatus: '2' })
-  const newEntry = component.methods.resolveChefEntry.call(ctx, {})
-  const activeEntry = component.methods.resolveChefEntry.call(ctx, { chefId: '1', auditStatus: '1', chefStatus: '0' })
+  const pendingEntry = component.methods.resolveChefAction.call(ctx, { chefId: '1', auditStatus: '0' })
+  const rejectedEntry = component.methods.resolveChefAction.call(ctx, { chefId: '1', auditStatus: '2' })
+  const newEntry = component.methods.resolveChefAction.call(ctx, {})
+  const activeEntry = component.methods.resolveChefAction.call(ctx, { chefId: '1', auditStatus: '1', chefStatus: '0' })
+  const profileEntry = component.methods.resolveChefAction.call(ctx, { chefId: '1', auditStatus: '1', chefStatus: '2' })
 
-  assert.equal(newEntry.title, '申请成为做饭人员')
-  assert.equal(pendingEntry.title, '查看申请进度')
-  assert.equal(rejectedEntry.title, '完善做饭人员资料')
+  assert.equal(newEntry.title, '申请入驻')
+  assert.equal(newEntry.buttonText, '申请入驻')
+  assert.equal(pendingEntry.buttonText, '查看进度')
+  assert.equal(rejectedEntry.buttonText, '完善资料')
+  assert.equal(profileEntry.title, '查看入驻资料')
+  assert.doesNotMatch(profileEntry.description, /工作台/)
   assert.equal(activeEntry, null)
+})
+
+test('mine page apply action shows a modal before navigating to the profile form', () => {
+  const component = loadComponentOptions()
+  const calls = []
+  uniMock.showModal = options => {
+    calls.push(['showModal', options.title, options.content])
+    options.success({ confirm: true })
+  }
+  const ctx = createPageContext(component, {
+    chef: {},
+    $tab: {
+      navigateTo(url) {
+        calls.push(['navigateTo', url])
+      },
+      reLaunch() {}
+    }
+  })
+
+  component.methods.handleChefAction.call(ctx)
+
+  assert.deepEqual(calls[0][0], 'showModal')
+  assert.equal(calls[0][1], '申请入驻')
+  assert.equal(calls[1][0], 'navigateTo')
+  assert.equal(calls[1][1], '/pages/work/profile')
 })

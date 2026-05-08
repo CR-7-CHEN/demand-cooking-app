@@ -116,11 +116,11 @@
         <view v-if="revenueTrend.length === 0" class="empty-alert">暂无收入趋势</view>
         <view v-else class="trend-list">
           <view v-for="item in revenueTrend" :key="item.date || item.label" class="trend-item">
-            <text class="trend-label">{{ item.label || item.date }}</text>
+            <view class="trend-label">{{ item.label || item.date }}</view>
             <view class="trend-track">
               <view class="trend-bar" :style="item._barStyle"></view>
             </view>
-            <text class="trend-amount">{{ formatMoney(item.amount) }}</text>
+            <view class="trend-amount">{{ formatMoney(item.amount) }}</view>
           </view>
         </view>
       </view>
@@ -914,8 +914,7 @@
   }
 
   .trend-item {
-    display: grid;
-    grid-template-columns: 112rpx minmax(0, 1fr) 128rpx;
+    display: flex;
     align-items: center;
     gap: 16rpx;
   }
@@ -924,19 +923,26 @@
   .trend-amount {
     color: #66716c;
     font-size: 24rpx;
+    line-height: 1.4;
   }
 
   .trend-label {
+    flex: 0 0 112rpx;
+    width: 112rpx;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
   .trend-amount {
+    flex: 0 0 128rpx;
+    width: 128rpx;
     text-align: right;
   }
 
   .trend-track {
+    flex: 1;
+    min-width: 0;
     height: 18rpx;
     overflow: hidden;
     border-radius: 8rpx;

@@ -2,63 +2,109 @@
   <view class="page">
     <view class="head-card">
       <view>
-        <text class="sub">{{ subText }}</text>
-        <view class="title">{{ displayMonth }}</view>
+        <text class="sub">结算详情</text>
+        <view class="title">{{ displayMonth || '结算详情' }}</view>
       </view>
       <text class="chip">{{ settlementStatusText }}</text>
     </view>
 
     <view v-if="loading" class="state-card">
-      <view class="empty-title">{{ loadingTitle }}</view>
+      <view class="empty-title">结算明细加载中...</view>
       <view class="empty-text">{{ loadingHint }}</view>
     </view>
 
     <block v-else>
       <view v-if="hasSettlement" class="amount-card">
-        <text class="amount-label">{{ payableAmountLabel }}</text>
+        <text class="amount-label">应发金额</text>
         <view class="amount">{{ money(payableAmount) }}</view>
-        <text class="amount-tip">{{ payableAmountTip }}</text>
+        <text class="amount-tip">包含底薪、提成和违约扣款，确认无异议后进入待发放。</text>
       </view>
 
       <view v-if="hasSettlement" class="grid">
         <view class="metric">
           <text class="num">{{ completeCount }}</text>
-          <text class="name">{{ completeCountLabel }}</text>
+          <text class="name">完成单数</text>
         </view>
         <view class="metric">
           <text class="num">{{ money(commissionAmount) }}</text>
-          <text class="name">{{ commissionLabel }}</text>
+          <text class="name">单子提成</text>
         </view>
         <view class="metric">
           <text class="num">{{ violationCount }}</text>
-          <text class="name">{{ violationCountLabel }}</text>
+          <text class="name">违约次数</text>
         </view>
         <view class="metric">
           <text class="num">{{ money(deductionAmount) }}</text>
-          <text class="name">{{ deductionAmountLabel }}</text>
+          <text class="name">违约扣款</text>
         </view>
         <view class="metric">
           <text class="num">{{ money(baseSalary) }}</text>
-          <text class="name">{{ baseSalaryLabel }}</text>
+          <text class="name">个人底薪</text>
         </view>
         <view class="metric">
           <text class="num">{{ money(finalCommission) }}</text>
-          <text class="name">{{ finalCommissionLabel }}</text>
+          <text class="name">扣款后提成</text>
         </view>
       </view>
 
       <view v-else class="state-card">
-        <view class="empty-title">{{ emptySettlementTitle }}</view>
-        <view class="empty-text">{{ emptySettlementHint }}</view>
+        <view class="empty-title">暂无结算记录</view>
+        <view class="empty-text">当前月份还没有可展示的结算数据。</view>
+      </view>
+
+      <view v-if="hasSettlement" class="section-card action-card">
+        <view class="section-head">
+          <view>
+            <view class="section-title">结算操作</view>
+            <view class="section-subtitle">先确认无异议；如果金额或订单范围不对，可以申请复核。</view>
+          </view>
+        </view>
+
+        <view v-if="canConfirmSettlement || canRequestReview" class="action-row">
+          <button v-if="canConfirmSettlement" class="primary-btn" :loading="submitting" :disabled="submitting" @click="confirmSettlement">确认无异议</button>
+          <button v-if="canRequestReview" class="ghost-btn" :disabled="submitting" @click="toggleReviewForm">{{ showReviewForm ? '收起复核' : '申请复核' }}</button>
+        </view>
+
+        <view v-if="showReviewForm" class="review-form">
+          <view class="reason-row">
+            <text
+              v-for="item in reviewReasonOptions"
+              :key="item.value"
+              :class="['reason-chip', { active: reviewForm.reviewReasonType === item.value }]"
+              @click="selectReviewReason(item.value)"
+            >
+              {{ item.label }}
+            </text>
+          </view>
+          <textarea
+            class="textarea"
+            v-model.trim="reviewForm.reviewRemark"
+            maxlength="200"
+            placeholder="补充说明哪里需要复核，方便平台快速处理"
+          />
+          <button class="primary-btn" :loading="submitting" :disabled="submitting" @click="submitSettlementReview">提交复核</button>
+        </view>
+
+        <view v-else-if="isReviewingSettlement" class="review-status">
+          <view class="status-title">复核中</view>
+          <view class="status-line">复核原因：{{ reviewReasonLabel || '待补充' }}</view>
+          <view class="status-line">复核说明：{{ reviewRemarkText }}</view>
+        </view>
+
+        <view v-else-if="settlement.reviewReply || settlement.reviewResult || settlement.reviewAction" class="review-status">
+          <view class="status-title">复核结果</view>
+          <view class="status-line">处理方式：{{ reviewResultText }}</view>
+          <view class="status-line">处理说明：{{ settlement.reviewReply || '平台已处理，请确认最新结算结果。' }}</view>
+        </view>
       </view>
 
       <view class="section-card">
         <view class="section-head">
           <view>
-            <view class="section-title">{{ orderSectionText }}</view>
-            <view class="section-subtitle">{{ orderSectionHint }}</view>
+            <view class="section-title">订单明细</view>
+            <view class="section-subtitle">优先使用结算详情里的明细，没有时再按结算单 ID 或月份补拉订单。</view>
           </view>
-          <text class="count-pill">{{ settlementOrders.length }} {{ orderCountUnit }}</text>
+          <text class="count-pill">{{ settlementOrders.length }} 单</text>
         </view>
 
         <view v-if="settlementOrders.length" class="detail-list">
@@ -68,35 +114,35 @@
               <text :class="['status', order.tone]">{{ order.statusText }}</text>
             </view>
             <view class="detail-line">
-              <text class="detail-label">{{ timeLabel }}</text>
-              <text class="detail-value">{{ order.time || timeEmptyText }}</text>
+              <text class="detail-label">时间</text>
+              <text class="detail-value">{{ order.time || '服务时间待返回' }}</text>
             </view>
             <view class="detail-line">
-              <text class="detail-label">{{ dishesLabel }}</text>
+              <text class="detail-label">菜品</text>
               <text class="detail-value">{{ order.dishes }}</text>
             </view>
             <view class="detail-money">
-              <text>{{ orderAmountLabel }} {{ money(order.amount) }}</text>
-              <text>{{ orderCommissionLabel }} {{ money(order.commission) }}</text>
+              <text>订单金额 {{ money(order.amount) }}</text>
+              <text>结算提成 {{ money(order.commission) }}</text>
             </view>
           </view>
         </view>
 
         <view v-else class="inner-empty">
-          <view class="empty-title">{{ emptyOrdersTitle }}</view>
-          <view class="empty-text">{{ emptyOrdersHint }}</view>
+          <view class="empty-title">暂无订单明细</view>
+          <view class="empty-text">该月份还没有进入这张结算单的完成订单。</view>
         </view>
       </view>
 
       <view class="section-card">
-        <view class="section-title">{{ deductionSectionText }}</view>
+        <view class="section-title">扣款说明</view>
         <view class="deduct-summary">
           <view class="deduct-item">
-            <text class="deduct-label">{{ violationCountLabel }}</text>
-            <text class="deduct-value">{{ violationCount }} {{ countUnit }}</text>
+            <text class="deduct-label">违约次数</text>
+            <text class="deduct-value">{{ violationCount }} 次</text>
           </view>
           <view class="deduct-item">
-            <text class="deduct-label">{{ deductionAmountLabel }}</text>
+            <text class="deduct-label">违约扣款</text>
             <text class="deduct-value danger">{{ money(deductionAmount) }}</text>
           </view>
         </view>
@@ -104,114 +150,60 @@
       </view>
 
       <view class="rule-card">
-        <view class="rule-title">{{ ruleSectionText }}</view>
-        <view class="rule-line">{{ ruleLineOne }}</view>
-        <view class="rule-line">{{ ruleLineTwo }}</view>
+        <view class="rule-title">结算口径</view>
+        <view class="rule-line">已完成且未退款订单计入结算；退款中、已退款、退款失败和做饭人员原因取消订单不计入。</view>
+        <view class="rule-line">当月违约达到 5 次且单子提成不少于 200 元时，从当月提成扣除 200 元，不扣个人底薪。</view>
       </view>
     </block>
   </view>
 </template>
 
 <script>
-  import { getChefSettlementDetail, getChefOrderList } from '@/api/cooking/chef'
+  import { getChefSettlementDetail, getChefOrderList, submitChefSettlementReview, confirmChefSettlement } from '@/api/cooking/chef'
 
   const SETTLED_STATUSES = ['FINISHED', 'COMPLETED', 'DONE']
+  const STATUS_TEXT_MAP = {
+    GENERATED: '待确认',
+    REVIEWING: '复核中',
+    CONFIRMED: '待发放',
+    PAID: '已发放'
+  }
+  const REVIEW_REASON_OPTIONS = [
+    { label: '提成金额有疑问', value: 'AMOUNT_DIFF' },
+    { label: '订单范围不一致', value: 'ORDER_DIFF' },
+    { label: '扣款需要核对', value: 'DEDUCTION_DIFF' },
+    { label: '其他原因', value: 'OTHER' }
+  ]
+  const REVIEW_REASON_LABEL_MAP = REVIEW_REASON_OPTIONS.reduce((result, item) => {
+    result[item.value] = item.label
+    return result
+  }, {})
+  const REVIEW_RESULT_LABEL_MAP = {
+    KEEP: '保持当前结算',
+    REGENERATE: '按最新订单重新计算'
+  }
 
   export default {
     data() {
       return {
         loading: false,
+        submitting: false,
         settlementId: '',
         queryMonth: '',
         settlement: {},
-        orders: []
+        orders: [],
+        showReviewForm: false,
+        reviewReasonOptions: REVIEW_REASON_OPTIONS,
+        reviewForm: {
+          reviewReasonType: REVIEW_REASON_OPTIONS[0].value,
+          reviewRemark: ''
+        }
       }
     },
     computed: {
-      subText() {
-        return '月度结算详情'
-      },
-      loadingTitle() {
-        return '\u7ed3\u7b97\u660e\u7ec6\u52a0\u8f7d\u4e2d...'
-      },
       loadingHint() {
-        const monthText = this.displayMonth || this.queryMonth || '\u672a\u77e5\u6708\u4efd'
-        return `\u6b63\u5728\u83b7\u53d6 ${monthText} \u7684\u7ed3\u7b97\u8be6\u60c5\u548c\u8ba2\u5355\u660e\u7ec6`
-      },
-      emptySettlementTitle() {
-        return '\u6682\u65e0\u7ed3\u7b97\u8bb0\u5f55'
-      },
-      emptySettlementHint() {
-        return '\u5f53\u524d\u65e0\u6cd5\u627e\u5230\u5bf9\u5e94\u7684\u6708\u5ea6\u7ed3\u7b97\u6570\u636e\uff0c\u53ef\u5207\u6362\u6708\u4efd\u6216\u68c0\u67e5 settlementId'
-      },
-      orderSectionText() {
-        return '订单明细'
-      },
-      orderSectionHint() {
-        return '\u4f18\u5148\u4f7f\u7528\u7ed3\u7b97\u8be6\u60c5\uff0c\u5e76\u6839\u636e settlementId \u6216\u6708\u4efd\u518d\u62c9\u53d6\u8ba2\u5355\u5217\u8868'
-      },
-      orderCountUnit() {
-        return '\u5355'
-      },
-      timeLabel() {
-        return '\u65f6\u95f4'
-      },
-      timeEmptyText() {
-        return '\u670d\u52a1\u65f6\u95f4\u5f85\u8fd4\u56de'
-      },
-      dishesLabel() {
-        return '\u83dc\u54c1'
-      },
-      orderAmountLabel() {
-        return '\u8ba2\u5355\u91d1\u989d'
-      },
-      orderCommissionLabel() {
-        return '\u7ed3\u7b97\u63d0\u6210'
-      },
-      deductionSectionText() {
-        return '扣款说明'
-      },
-      ruleSectionText() {
-        return '\u7ed3\u7b97\u53e3\u5f84'
-      },
-      ruleLineOne() {
-        return '\u5df2\u5b8c\u6210\u4e14\u672a\u9000\u6b3e\u8ba2\u5355\u8ba1\u5165\u7ed3\u7b97\uff1b\u9000\u6b3e\u4e2d\u3001\u5df2\u9000\u6b3e\u3001\u9000\u6b3e\u5931\u8d25\u548c\u505a\u996d\u4eba\u5458\u539f\u56e0\u53d6\u6d88\u8ba2\u5355\u4e0d\u8ba1\u5165\u3002'
-      },
-      ruleLineTwo() {
-        return '\u5f53\u6708\u8fdd\u7ea6\u8fbe\u5230 5 \u6b21\u4e14\u5355\u5b50\u63d0\u6210\u4e0d\u5c11\u4e8e 200 \u5143\u65f6\uff0c\u4ece\u5f53\u6708\u63d0\u6210\u6263\u9664 200 \u5143\uff0c\u4e0d\u6263\u4e2a\u4eba\u5e95\u85aa\u3002'
-      },
-      payableAmountLabel() {
-        return '\u5e94\u53d1\u91d1\u989d'
-      },
-      payableAmountTip() {
-        return '\u5305\u542b\u6708\u5e95\u85aa\u3001\u63d0\u6210\u548c\u6263\u6b3e\u540e\u7ed3\u7b97\u7ed3\u6784\uff0c\u6700\u7ec8\u4ee5\u540e\u53f0\u786e\u8ba4\u4e3a\u51c6'
-      },
-      completeCountLabel() {
-        return '\u5b8c\u6210\u5355\u6570'
-      },
-      commissionLabel() {
-        return '\u5355\u5b50\u63d0\u6210'
-      },
-      violationCountLabel() {
-        return '\u8fdd\u7ea6\u6b21\u6570'
-      },
-      deductionAmountLabel() {
-        return '\u8fdd\u7ea6\u6263\u6b3e'
-      },
-      baseSalaryLabel() {
-        return '\u4e2a\u4eba\u5e95\u85aa'
-      },
-      finalCommissionLabel() {
-        return '\u6263\u6b3e\u540e\u63d0\u6210'
-      },
-      countUnit() {
-        return '\u6b21'
-      },
-      emptyOrdersTitle() {
-        return '\u6682\u65e0\u8ba2\u5355\u660e\u7ec6'
-      },
-      emptyOrdersHint() {
-        return '\u8be5\u6708\u4efd\u6682\u65e0\u5df2\u5b8c\u6210\u4e14\u53ef\u8ba1\u5165\u7ed3\u7b97\u7684\u8ba2\u5355\u3002'
+        const monthText = this.displayMonth || this.queryMonth || '当前月份'
+        return `正在获取 ${monthText} 的结算详情和订单明细`
       },
       displayMonth() {
         return this.formatMonth(this.value('settlementMonth', 'month') || this.queryMonth)
@@ -222,14 +214,38 @@
           return value !== undefined && value !== null && value !== ''
         })
       },
+      settlementStatusKey() {
+        return this.normalizeStatus(this.value('settlementStatus', 'status', 'statusCode', 'settleStatus')) || 'GENERATED'
+      },
       settlementStatusText() {
-        return this.value('settlementStatusName', 'statusName', 'settlementStatus') || (this.queryMonth || '\u6708\u5ea6\u7ed3\u7b97')
+        const direct = this.value('settlementStatusName', 'statusName', 'statusText')
+        return direct || STATUS_TEXT_MAP[this.settlementStatusKey] || '待确认'
+      },
+      canConfirmSettlement() {
+        return this.settlementStatusKey === 'GENERATED'
+      },
+      canRequestReview() {
+        return this.settlementStatusKey === 'GENERATED'
+      },
+      isReviewingSettlement() {
+        return this.settlementStatusKey === 'REVIEWING'
+      },
+      reviewReasonLabel() {
+        const reason = this.value('reviewReasonType', 'reviewReason')
+        return REVIEW_REASON_LABEL_MAP[reason] || reason || ''
+      },
+      reviewRemarkText() {
+        return this.value('reviewRemark') || '已提交复核申请'
+      },
+      reviewResultText() {
+        const result = this.value('reviewResult', 'reviewAction')
+        return REVIEW_RESULT_LABEL_MAP[result] || result || '待平台处理'
       },
       payableAmount() {
         return this.value('payableAmount', 'salaryAmount', 'totalPayable', 'monthIncome', 'totalAmount')
       },
       completeCount() {
-        return this.value('completeCount', 'completedOrderCount', 'finishedCount', 'orderCount')
+        return this.value('completeCount', 'completedOrderCount', 'finishedCount', 'completedCount', 'orderCount')
       },
       commissionAmount() {
         return this.value('orderCommission', 'chefCommission', 'commissionAmount', 'totalCommission')
@@ -257,20 +273,20 @@
         const deduction = Number(this.deductionAmount || 0)
         if (deduction > 0) {
           return [
-            `\u672c\u6708\u8fdd\u7ea6 ${count} \u6b21\uff0c\u5df2\u89e6\u53d1\u8fdd\u7ea6\u6263\u6b3e\u3002`,
-            '\u6263\u6b3e\u4ece\u5f53\u6708\u5355\u5b50\u63d0\u6210\u4e2d\u6263\u9664\uff0c\u4e0d\u4f1a\u518d\u6263\u4e2a\u4eba\u5e95\u85aa\u3002'
+            `本月违约 ${count} 次，已触发违约扣款。`,
+            '扣款仅从当月提成中扣除，不会再扣个人底薪。'
           ]
         }
         if (count <= 0) {
-          return ['\u672c\u6708\u6682\u65e0\u8fdd\u7ea6\u8bb0\u5f55\uff0c\u4e0d\u4ea7\u751f\u8fdd\u7ea6\u6263\u6b3e\u3002']
+          return ['本月暂无违约记录，不产生违约扣款。']
         }
         if (count < 5) {
-          return [`\u672c\u6708\u8fdd\u7ea6 ${count} \u6b21\uff0c\u672a\u8fbe\u5230 5 \u6b21\u6263\u6b3e\u6761\u4ef6\u3002`]
+          return [`本月违约 ${count} 次，未达到 5 次扣款条件。`]
         }
         if (commission < 200) {
-          return [`\u672c\u6708\u8fdd\u7ea6 ${count} \u6b21\uff0c\u4f46\u5355\u5b50\u63d0\u6210\u4e0d\u8db3 200 \u5143\uff0c\u4e0d\u89e6\u53d1 200 \u5143\u6263\u6b3e\u3002`]
+          return [`本月违约 ${count} 次，但单子提成不足 200 元，不触发 200 元扣款。`]
         }
-        return ['\u540e\u53f0\u6682\u672a\u8fd4\u56de\u6263\u6b3e\u91d1\u989d\uff0c\u5b9e\u9645\u4ee5\u540e\u53f0\u7ed3\u7b97\u786e\u8ba4\u7ed3\u679c\u4e3a\u51c6\u3002']
+        return ['后台暂未返回扣款金额，实际以平台结算确认为准。']
       }
     },
     onLoad(options) {
@@ -280,7 +296,9 @@
     },
     onPullDownRefresh() {
       this.load().finally(() => {
-        uni.stopPullDownRefresh()
+        if (typeof uni !== 'undefined' && uni.stopPullDownRefresh) {
+          uni.stopPullDownRefresh()
+        }
       })
     },
     methods: {
@@ -313,6 +331,105 @@
         }).catch(() => {
           this.orders = []
         })
+      },
+      toggleReviewForm() {
+        this.showReviewForm = !this.showReviewForm
+      },
+      selectReviewReason(value) {
+        this.reviewForm.reviewReasonType = value
+      },
+      submitSettlementReview() {
+        const reasonType = this.reviewForm.reviewReasonType || this.reviewForm.reasonType
+        const reviewRemark = String(this.reviewForm.reviewRemark || this.reviewForm.remark || '').trim()
+        const useLegacyPayload = this.reviewForm.reasonType !== undefined || this.reviewForm.remark !== undefined
+        if (!this.settlementId) {
+          this.notifyError('缺少结算单 ID')
+          return Promise.resolve()
+        }
+        if (!reasonType) {
+          this.notifyError('请选择复核原因')
+          return Promise.resolve()
+        }
+        if (!reviewRemark) {
+          this.notifyError('请填写复核说明')
+          return Promise.resolve()
+        }
+        this.submitting = true
+        const payload = useLegacyPayload
+          ? {
+              settlementId: this.settlementId,
+              reasonType,
+              remark: reviewRemark
+            }
+          : {
+              settlementId: this.settlementId,
+              reviewReasonType: reasonType,
+              reviewRemark
+            }
+        return submitChefSettlementReview(payload).then(() => {
+          this.notifySuccess('复核申请已提交')
+          this.showReviewForm = false
+          return this.load()
+        }).finally(() => {
+          this.submitting = false
+        })
+      },
+      confirmSettlement() {
+        if (!this.settlementId) {
+          this.notifyError('缺少结算单 ID')
+          return Promise.resolve()
+        }
+        return this.confirmAction('确认当前结算无异议？确认后将等待平台发放。').then(() => {
+          this.submitting = true
+          return confirmChefSettlement({
+            settlementId: this.settlementId
+          }).then(() => {
+            this.notifySuccess('已确认无异议')
+            return this.load()
+          }).finally(() => {
+            this.submitting = false
+          })
+        }).catch(() => {})
+      },
+      confirmAction(content) {
+        if (this.$modal && this.$modal.confirm) {
+          return this.$modal.confirm(content)
+        }
+        if (typeof uni !== 'undefined' && uni.showModal) {
+          return new Promise((resolve, reject) => {
+            uni.showModal({
+              title: '系统提示',
+              content,
+              success: res => {
+                if (res.confirm) {
+                  resolve(true)
+                  return
+                }
+                reject(new Error('cancel'))
+              },
+              fail: reject
+            })
+          })
+        }
+        return Promise.resolve(true)
+      },
+      notifySuccess(message) {
+        if (this.$modal && this.$modal.msgSuccess) {
+          this.$modal.msgSuccess(message)
+          return
+        }
+        if (typeof uni !== 'undefined' && uni.showToast) {
+          uni.showToast({ title: message, icon: 'success' })
+        }
+      },
+      notifyError(message) {
+        if (this.$modal && this.$modal.showToast) {
+          this.$modal.showToast(message)
+          return
+        }
+        if (typeof uni !== 'undefined' && uni.showToast) {
+          uni.showToast({ title: message, icon: 'none' })
+        }
       },
       normalizeSettlement(res) {
         const data = this.unwrap(res)
@@ -392,12 +509,12 @@
         const id = order.id || order.orderId || order.orderNo || order.orderCode || ('order-' + index)
         return {
           id,
-          no: order.orderNo || order.orderCode || ('\u8ba2\u5355 #' + id),
+          no: order.orderNo || order.orderCode || ('订单 #' + id),
           time: this.getOrderTime(order) || order.createTime || '',
           dishes: this.getDishes(order),
           amount: order.payAmount || order.totalAmount || order.quoteAmount || order.orderAmount || 0,
           commission: order.chefCommission || order.orderCommission || order.commissionAmount || order.settlementAmount || 0,
-          statusText: order.statusName || order.orderStatusName || '\u5df2\u5b8c\u6210',
+          statusText: order.statusName || order.orderStatusName || '已完成',
           tone: this.isSettlementOrder(order) ? 'ok' : 'muted'
         }
       },
@@ -423,9 +540,9 @@
       getDishes(order) {
         const dishes = order.dishes || order.dishList || order.dishNames || order.dishSnapshot || order.menu
         if (Array.isArray(dishes)) {
-          return dishes.map(item => typeof item === 'string' ? item : item.name || item.dishName).filter(Boolean).join('\u3001') || '\u672a\u586b\u5199'
+          return dishes.map(item => typeof item === 'string' ? item : item.name || item.dishName).filter(Boolean).join('、') || '未填写'
         }
-        return dishes || order.dishRemark || '\u672a\u586b\u5199'
+        return dishes || order.dishRemark || '未填写'
       },
       formatMonth(value) {
         if (!value) return ''
@@ -443,7 +560,7 @@
       },
       money(value) {
         const number = Number(value || 0)
-        return '楼' + (isNaN(number) ? 0 : number).toFixed(2)
+        return '¥' + (isNaN(number) ? 0 : number).toFixed(2)
       }
     }
   }
@@ -564,7 +681,9 @@
   .detail-line,
   .detail-money,
   .deduct-summary,
-  .deduct-item {
+  .deduct-item,
+  .action-row,
+  .reason-row {
     display: flex;
     align-items: center;
   }
@@ -578,7 +697,8 @@
 
   .section-title,
   .rule-title,
-  .empty-title {
+  .empty-title,
+  .status-title {
     font-size: 30rpx;
     font-weight: 700;
   }
@@ -594,6 +714,75 @@
     color: #2f8f55;
     background: #e6f5ec;
     font-size: 22rpx;
+  }
+
+  .action-row {
+    gap: 20rpx;
+    margin-top: 20rpx;
+  }
+
+  .primary-btn,
+  .ghost-btn {
+    flex: 1;
+    height: 84rpx;
+    line-height: 84rpx;
+    border-radius: 42rpx;
+    font-size: 28rpx;
+  }
+
+  .primary-btn {
+    color: #fff;
+    background: linear-gradient(135deg, #f08a48, #d65e2d);
+  }
+
+  .ghost-btn {
+    color: #b85d2b;
+    background: #fff3ea;
+  }
+
+  .review-form,
+  .review-status {
+    margin-top: 22rpx;
+    padding: 22rpx;
+    border-radius: 12rpx;
+    background: #fff7f0;
+  }
+
+  .reason-row {
+    flex-wrap: wrap;
+    gap: 16rpx;
+  }
+
+  .reason-chip {
+    padding: 10rpx 18rpx;
+    border-radius: 999rpx;
+    color: #7d4e23;
+    background: #ffe5d6;
+    font-size: 24rpx;
+  }
+
+  .reason-chip.active {
+    color: #fff;
+    background: #d96a35;
+  }
+
+  .textarea {
+    width: 100%;
+    min-height: 180rpx;
+    margin-top: 18rpx;
+    padding: 20rpx;
+    box-sizing: border-box;
+    border-radius: 12rpx;
+    background: #fff;
+    font-size: 26rpx;
+    line-height: 1.6;
+  }
+
+  .status-line {
+    margin-top: 12rpx;
+    color: #526158;
+    font-size: 25rpx;
+    line-height: 1.6;
   }
 
   .detail-list {
@@ -664,10 +853,6 @@
     border-radius: 8rpx;
     background: #fffaf6;
     text-align: center;
-  }
-
-  .empty-text {
-    margin-top: 10rpx;
   }
 
   .deduct-summary {

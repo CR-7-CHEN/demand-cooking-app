@@ -11,7 +11,7 @@
     </view>
 
     <view v-if="queryMonth" class="toolbar">
-      <text class="toolbar-clear" @click="clearMonthFilter">查看全部</text>
+      <text class="toolbar-clear" @click="clearMonthFilter">重置月份</text>
     </view>
 
     <scroll-view
@@ -23,7 +23,7 @@
       @scrolltolower="loadNextPage"
     >
       <view v-if="loading && !settlementList.length" class="state-card">
-        <view class="state-title">结算列表加载中...</view>
+        <view class="state-title">结算记录加载中...</view>
         <view class="state-text">正在获取月度结算记录。</view>
       </view>
 
@@ -73,6 +73,10 @@
   const PAGE_SIZE = 8
 
   const STATUS_TEXT_MAP = {
+    GENERATED: '待确认',
+    REVIEWING: '复核中',
+    CONFIRMED: '待发放',
+    PAID: '已发放',
     SETTLED: '已结算',
     FINISHED: '已结算',
     COMPLETED: '已结算',
@@ -88,6 +92,10 @@
   }
 
   const STATUS_TONE_MAP = {
+    GENERATED: 'warning',
+    REVIEWING: 'info',
+    CONFIRMED: 'warning',
+    PAID: 'success',
     SETTLED: 'success',
     FINISHED: 'success',
     COMPLETED: 'success',
@@ -121,7 +129,7 @@
         return this.hasMore && !this.loading && !this.refreshing
       },
       headerMonthText() {
-        return this.queryMonth || '结算列表'
+        return this.queryMonth || '月度结算'
       },
       pickerValue() {
         return this.queryMonth || this.currentMonth()
@@ -315,8 +323,7 @@
           'settlementStatusName',
           'statusText'
         ])
-        if (direct) return String(direct)
-        return STATUS_TEXT_MAP[statusKey] || '待确认'
+        return STATUS_TEXT_MAP[statusKey] || String(direct || '待确认')
       },
       statusTone(statusKey) {
         return STATUS_TONE_MAP[statusKey] || 'muted'
@@ -328,6 +335,18 @@
           'remark',
           'note'
         ])
+        if (statusKey === 'GENERATED') {
+          return '请进入详情确认无异议或申请复核'
+        }
+        if (statusKey === 'REVIEWING') {
+          return String(direct || '复核处理中，请耐心等待')
+        }
+        if (statusKey === 'CONFIRMED') {
+          return '已确认无异议，待平台发放'
+        }
+        if (statusKey === 'PAID') {
+          return '已发放，请留意到账情况'
+        }
         if (direct) return String(direct)
         if (statusKey === 'SETTLED' || statusKey === 'FINISHED' || statusKey === 'COMPLETED' || statusKey === 'DONE') {
           return '点击查看结算详情'
@@ -357,7 +376,7 @@
       formatMoney(value) {
         const number = Number(value)
         const safeNumber = Number.isNaN(number) ? 0 : number
-        return `￥${safeNumber.toFixed(2)}`
+        return `¥${safeNumber.toFixed(2)}`
       },
       goDetail(item) {
         if (!item || !item.id) {

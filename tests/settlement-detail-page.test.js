@@ -14,7 +14,15 @@ function loadComponentOptions() {
   assert.ok(match, 'expected settlement detail page to contain a script block')
 
   const script = match[1]
-    .replace(/import\s+\{\s*getChefSettlementDetail,\s*getChefOrderList\s*\}\s+from\s+'@\/api\/cooking\/chef'\s*/, "const getChefSettlementDetail = () => Promise.resolve({})\nconst getChefOrderList = () => Promise.resolve({})\n")
+    .replace(
+      /import\s+\{[\s\S]*?\}\s+from\s+'@\/api\/cooking\/chef'\s*/,
+      [
+        'const getChefSettlementDetail = globalThis.__testApi.getChefSettlementDetail',
+        'const getChefOrderList = globalThis.__testApi.getChefOrderList',
+        'const submitChefSettlementReview = globalThis.__testApi.submitChefSettlementReview',
+        'const confirmChefSettlement = globalThis.__testApi.confirmChefSettlement'
+      ].join('\n') + '\n'
+    )
     .replace(/export default/, 'module.exports =')
 
   const sandbox = {
@@ -24,7 +32,15 @@ function loadComponentOptions() {
     console,
     Promise,
     setTimeout,
-    clearTimeout
+    clearTimeout,
+    globalThis: {
+      __testApi: {
+        getChefSettlementDetail: () => Promise.resolve({}),
+        getChefOrderList: () => Promise.resolve({}),
+        submitChefSettlementReview: () => Promise.resolve({}),
+        confirmChefSettlement: () => Promise.resolve({})
+      }
+    }
   }
 
   vm.runInNewContext(script, sandbox, { filename: detailPagePath })
@@ -37,12 +53,25 @@ function createPageContext(component, overrides = {}) {
 
   Object.assign(ctx, component.methods)
 
-  Object.defineProperty(ctx, 'displayMonth', {
-    configurable: true,
-    enumerable: true,
-    get() {
-      return component.computed.displayMonth.call(ctx)
-    }
+  const computedNames = [
+    'displayMonth',
+    'settlementStatusKey',
+    'canConfirmSettlement',
+    'canRequestReview',
+    'isReviewingSettlement',
+    'reviewReasonLabel',
+    'reviewRemarkText'
+  ]
+
+  computedNames.forEach(name => {
+    if (!component.computed[name]) return
+    Object.defineProperty(ctx, name, {
+      configurable: true,
+      enumerable: true,
+      get() {
+        return component.computed[name].call(ctx)
+      }
+    })
   })
 
   return ctx
@@ -50,23 +79,33 @@ function createPageContext(component, overrides = {}) {
 
 test('settlement detail api and route are wired for a dedicated detail page', () => {
   assert.match(apiSource, /export function getChefSettlementDetail\(id\) \{/)
+  assert.match(apiSource, /export function submitChefSettlementReview\(data\) \{/)
+  assert.match(apiSource, /url: '\/cooking\/settlement\/chef\/review'/)
+  assert.match(apiSource, /export function confirmChefSettlement\(data\) \{/)
+  assert.match(apiSource, /url: '\/cooking\/settlement\/chef\/confirm'/)
   assert.match(apiSource, /url: `\/cooking\/settlement\/\$\{id\}`/)
   assert.match(pagesSource, /"path": "pages\/work\/settlement-detail"/)
   assert.match(pagesSource, /"navigationBarTitleText": "结算详情"/)
   assert.ok(fs.existsSync(detailPagePath))
 })
 
-test('settlement detail page loads settlement and orders by settlementId or month', () => {
+test('settlement detail page loads settlement, orders, and settlement action apis from the chef api module', () => {
   const source = detailPageSource
 
-  assert.match(source, /import \{ getChefSettlementDetail, getChefOrderList \} from '@\/api\/cooking\/chef'/)
+  assert.match(
+    source,
+    /import \{[\s\S]*getChefSettlementDetail[\s\S]*getChefOrderList[\s\S]*submitChefSettlementReview[\s\S]*confirmChefSettlement[\s\S]*\} from '@\/api\/cooking\/chef'/
+  )
   assert.match(source, /onLoad\(options\)/)
   assert.match(source, /this\.settlementId\s*=\s*options\.id/)
   assert.match(source, /this\.queryMonth\s*=\s*this\.formatMonth\(options\.month \|\| options\.settlementMonth \|\| ''\)/)
   assert.match(source, /getChefSettlementDetail\(this\.settlementId\)/)
   assert.match(source, /getChefOrderList\(\{[\s\S]*settlementId: this\.settlementId[\s\S]*month: this\.queryMonth/)
-  assert.match(source, /return '订单明细'/)
-  assert.match(source, /return '扣款说明'/)
+  assert.match(source, /submitChefSettlementReview\(/)
+  assert.match(source, /confirmChefSettlement\(/)
+  assert.match(source, /申请复核/)
+  assert.match(source, /确认无异议/)
+  assert.match(source, /复核中/)
 })
 
 test('settlement detail page waits for settlement detail month before loading fallback orders', async () => {
