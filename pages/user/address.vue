@@ -36,9 +36,21 @@
       </view>
       <view class="field">
         <text>所在区域</text>
-        <picker mode="region" :value="regionValue" @change="changeRegion">
-          <view class="picker-value" :class="{ placeholder: !form.region }">
-            {{ form.region || '请选择省/市/区' }}
+        <picker
+          mode="multiSelector"
+          :range="regionColumns"
+          :value="regionValue"
+          @click="onRegionPickerOpen"
+          @columnchange="onRegionColumnChange"
+          @change="changeRegion"
+          @cancel="onRegionCancel"
+        >
+          <view
+            :class="['picker-value', { placeholder: !form.region }, regionPickerOpen ? 'top' : 'bottom']"
+            @click="onRegionPickerOpen"
+          >
+            <text>{{ form.region || '请选择省/市/区' }}</text>
+            <text class="picker-arrow"></text>
           </view>
         </picker>
       </view>
@@ -51,8 +63,8 @@
         <input v-model="form.houseNumber" placeholder="如 2 单元 1201" />
       </view>
       <view class="switch-row">
-        <text>设为默认地址</text>
-        <switch :checked="form.isDefault" color="#2f7dff" @change="changeDefault" />
+        <text class="default-switch-label">设为默认地址</text>
+        <switch class="blue" :class="{ checked: form.isDefault }" :checked="form.isDefault" color="#2f7dff" @change="changeDefault" />
       </view>
       <button class="save-btn" :disabled="saving" @click="save">保存地址</button>
     </view>
@@ -61,15 +73,29 @@
 
 <script>
   import { listAddresses, addAddress, updateAddress, deleteAddress } from '@/api/cooking/user'
+  import regionData from '@/utils/region-data'
 
   export default {
     data() {
       return {
         loading: false,
         saving: false,
-        regionValue: [],
+        regionValue: [0, 0, 0],
+        regionPickerOpen: false,
         addresses: [],
         form: this.blankForm()
+      }
+    },
+    computed: {
+      regionColumns() {
+        const provinceList = this.getProvinceList()
+        const cityList = this.getCityList(this.regionValue[0])
+        const districtList = this.getDistrictList(this.regionValue[0], this.regionValue[1])
+        return [
+          provinceList.map(item => item.name),
+          cityList.map(item => item.name),
+          districtList.map(item => typeof item === 'string' ? item : item.name)
+        ]
       }
     },
     onShow() {
@@ -106,7 +132,7 @@
         return []
       },
       normalizeAddress(item) {
-        const region = item.region || item.area || item.district || ''
+        const region = item.region || item.areaName || item.area || item.district || ''
         const detail = item.detailAddress || item.address || item.detail || ''
         const house = item.houseNumber || item.doorNo || item.houseNo || ''
         const isDefault = this.normalizeDefault(item.isDefault, item.defaultFlag)
@@ -125,14 +151,15 @@
         return values.some(value => value === true || value === 1 || value === '1' || value === 'true' || value === 'Y')
       },
       parseRegionValue(region) {
-        if (!region) return []
-        if (Array.isArray(region)) return region.filter(Boolean)
+        if (!region) return [0, 0, 0]
+        if (Array.isArray(region)) return this.normalizeRegionValue(region)
         const parts = String(region).split(/[\s/,-]+/).filter(Boolean)
-        return parts.length === 3 ? parts : []
+        return parts.length >= 3 ? this.findRegionValue(parts.slice(0, 3)) : [0, 0, 0]
       },
       startAdd() {
         this.form = this.blankForm()
-        this.regionValue = []
+        this.regionValue = [0, 0, 0]
+        this.regionPickerOpen = false
       },
       startEdit(item) {
         this.form = {
@@ -146,10 +173,76 @@
         }
         this.regionValue = this.parseRegionValue(item.region)
       },
+      onRegionPickerOpen() {
+        this.regionPickerOpen = true
+      },
+      onRegionCancel() {
+        this.regionPickerOpen = false
+      },
+      onRegionColumnChange(e) {
+        const detail = e.detail || {}
+        const column = Number(detail.column || 0)
+        const value = Number(detail.value || 0)
+        const nextValue = this.regionValue.slice()
+        nextValue[column] = value
+        if (column === 0) {
+          nextValue[1] = 0
+          nextValue[2] = 0
+        } else if (column === 1) {
+          nextValue[2] = 0
+        }
+        this.regionValue = this.normalizeRegionValue(nextValue)
+      },
       changeRegion(e) {
-        const value = e.detail.value || []
+        this.regionPickerOpen = false
+        const value = this.normalizeRegionValue(e.detail && e.detail.value ? e.detail.value : this.regionValue)
         this.regionValue = value
-        this.form.region = value.filter(Boolean).join(' ')
+        this.form.region = this.getRegionName(value)
+      },
+      getProvinceList() {
+        return Array.isArray(regionData) ? regionData : []
+      },
+      getCityList(provinceIndex) {
+        const province = this.getProvinceList()[Number(provinceIndex || 0)] || {}
+        return Array.isArray(province.children) ? province.children : []
+      },
+      getDistrictList(provinceIndex, cityIndex) {
+        const city = this.getCityList(provinceIndex)[Number(cityIndex || 0)] || {}
+        return Array.isArray(city.children) ? city.children : []
+      },
+      normalizeRegionValue(value) {
+        const nextValue = Array.isArray(value) ? value : []
+        const provinceList = this.getProvinceList()
+        const provinceIndex = this.clampIndex(nextValue[0], provinceList.length)
+        const cityList = this.getCityList(provinceIndex)
+        const cityIndex = this.clampIndex(nextValue[1], cityList.length)
+        const districtList = this.getDistrictList(provinceIndex, cityIndex)
+        const districtIndex = this.clampIndex(nextValue[2], districtList.length)
+        return [provinceIndex, cityIndex, districtIndex]
+      },
+      clampIndex(index, length) {
+        const value = Number(index || 0)
+        if (!length || value < 0) return 0
+        return value >= length ? length - 1 : value
+      },
+      getRegionName(value) {
+        const regionValue = this.normalizeRegionValue(value)
+        const province = this.getProvinceList()[regionValue[0]]
+        const city = this.getCityList(regionValue[0])[regionValue[1]]
+        const district = this.getDistrictList(regionValue[0], regionValue[1])[regionValue[2]]
+        const districtName = typeof district === 'string' ? district : district && district.name
+        return [province && province.name, city && city.name, districtName].filter(Boolean).join(' ')
+      },
+      findRegionValue(parts) {
+        const provinceIndex = this.getProvinceList().findIndex(item => item.name === parts[0])
+        if (provinceIndex < 0) return [0, 0, 0]
+        const cityIndex = this.getCityList(provinceIndex).findIndex(item => item.name === parts[1])
+        if (cityIndex < 0) return [provinceIndex, 0, 0]
+        const districtIndex = this.getDistrictList(provinceIndex, cityIndex).findIndex(item => {
+          const name = typeof item === 'string' ? item : item && item.name
+          return name === parts[2]
+        })
+        return this.normalizeRegionValue([provinceIndex, cityIndex, districtIndex < 0 ? 0 : districtIndex])
       },
       changeDefault(e) {
         this.form.isDefault = e.detail.value
@@ -173,18 +266,27 @@
         }
         return true
       },
+      buildPayload() {
+        return {
+          addressId: this.form.id || null,
+          contactName: this.form.contactName,
+          contactPhone: this.form.phone,
+          areaName: this.form.region,
+          detailAddress: this.form.detailAddress,
+          houseNumber: this.form.houseNumber,
+          defaultFlag: this.form.isDefault ? 'Y' : 'N'
+        }
+      },
       save() {
         if (!this.validate()) return
         this.saving = true
         const action = this.form.id ? updateAddress : addAddress
-        const payload = {
-          ...this.form,
-          defaultFlag: this.form.isDefault ? 1 : 0
-        }
+        const payload = this.buildPayload()
         action(payload).then(() => {
           this.$modal.msgSuccess('地址已保存')
           this.form = this.blankForm()
-          this.regionValue = []
+          this.regionValue = [0, 0, 0]
+          this.regionPickerOpen = false
           this.load()
         }).finally(() => {
           this.saving = false
@@ -335,12 +437,21 @@
     font-size: 27rpx;
   }
 
+  .default-switch-label {
+    color: #2f7dff;
+    font-weight: 600;
+  }
+
   .field picker {
     flex: 1;
     margin-left: 24rpx;
   }
 
   .picker-value {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 12rpx;
     min-height: 68rpx;
     line-height: 68rpx;
     color: #26322d;
@@ -350,6 +461,22 @@
 
   .picker-value.placeholder {
     color: #b6bdb9;
+  }
+
+  .picker-arrow {
+    width: 12rpx;
+    height: 12rpx;
+    border-right: 2rpx solid #8a8f98;
+    border-bottom: 2rpx solid #8a8f98;
+    transition: transform .2s ease;
+  }
+
+  .picker-value.bottom .picker-arrow {
+    transform: rotate(45deg);
+  }
+
+  .picker-value.top .picker-arrow {
+    transform: rotate(225deg);
   }
 
   .save-btn {

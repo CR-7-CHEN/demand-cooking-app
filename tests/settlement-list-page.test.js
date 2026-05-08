@@ -30,3 +30,10 @@ test('settlement page renders a paged card list with pull-down refresh and load-
   assert.doesNotMatch(source, /订单明细/)
   assert.doesNotMatch(source, /扣款说明/)
 })
+
+test('settlement page normalizes natural-month list payload fields from backend settlement records', () => {
+  assert.match(source, /'settlementNo'/)
+  assert.match(source, /'completedCount'/)
+  assert.match(source, /'settlementStatusName'/)
+  assert.match(source, /if \(\/\^\\d\{6\}\$\/\.test\(text\)\) return `\$\{text\.slice\(0, 4\)\}-\$\{text\.slice\(4, 6\)\}`/)
+})

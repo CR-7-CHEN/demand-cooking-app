@@ -11,18 +11,22 @@ function normalizeStatus(value) {
   return value === undefined || value === null ? '' : String(value).trim();
 }
 
+function pickStatusValue(primary, fallback) {
+  return primary === undefined || primary === null ? fallback : primary;
+}
+
 function hasChefProfile(chef) {
   return !!(chef && (chef.id || chef.chefId));
 }
 
 function getAuditStatus(chef) {
   if (!chef) return '';
-  return normalizeStatus(chef.auditStatus || chef.identityStatus);
+  return normalizeStatus(pickStatusValue(chef.auditStatus, chef.identityStatus));
 }
 
 function getChefServiceStatus(chef) {
   if (!chef) return '';
-  return normalizeStatus(chef.chefStatus || chef.status);
+  return normalizeStatus(pickStatusValue(chef.chefStatus, chef.status));
 }
 
 function isChefApproved(chef) {

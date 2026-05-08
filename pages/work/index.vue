@@ -1,5 +1,5 @@
 <template>
-  <view class="chef-work-page">
+  <view v-if="!redirectingToMine" class="chef-work-page">
     <view class="top-card">
       <view class="top-row">
         <view>
@@ -30,23 +30,6 @@
         <view v-else class="notice-empty">暂无公告</view>
       </view>
 
-    </view>
-
-    <view v-if="needApply" class="empty-card">
-      <button class="primary-btn" @click="goProfile">申请入驻</button>
-    </view>
-
-    <view v-if="hasChefProfile && !isChefWorkbenchAvailable" class="quick-section">
-      <view class="quick-list">
-        <view class="quick-item" @click="goProfile">
-          <view class="quick-icon dark">资料</view>
-          <view class="quick-body">
-            <text class="quick-title">入驻资料</text>
-            <text class="quick-desc">查看已提交的审核资料，可进行修改</text>
-          </view>
-          <text class="arrow">›</text>
-        </view>
-      </view>
     </view>
 
     <view v-if="isChefWorkbenchAvailable" class="summary-grid">
@@ -129,6 +112,18 @@
     getWorkbenchAnnouncements
   } from '@/api/cooking/chef'
   const chefStatus = require('@/utils/chef-status')
+  const orderStatus = require('@/utils/order-status')
+  const CHEF_ORDER_GROUP_MAP = {
+    [orderStatus.ORDER_STATUS.WAITING_RESPONSE]: 'response',
+    [orderStatus.ORDER_STATUS.PRICE_OBJECTION]: 'dispute',
+    [orderStatus.ORDER_STATUS.WAITING_SERVICE]: 'service',
+    [orderStatus.ORDER_STATUS.WAITING_CONFIRM]: 'confirm',
+    [orderStatus.ORDER_STATUS.COMPLETED]: 'done'
+  }
+
+  function chefOrderStatusGroup(status) {
+    return CHEF_ORDER_GROUP_MAP[orderStatus.normalizeOrderStatus(status)] || ''
+  }
 
   export default {
     data() {
@@ -137,6 +132,7 @@
         chef: {},
         orders: [],
         announcements: [],
+        redirectingToMine: false,
         resignReasonInput: '',
         resignSubmitting: false
       }
@@ -182,17 +178,18 @@
         const now = new Date()
         const monthKey = this.formatMonth(now)
         return this.orders.reduce((result, order) => {
-          const status = this.normalizeStatus(order.status || order.orderStatus)
-          if (this.isStatus(status, ['WAIT_CHEF_RESPONSE', 'PENDING_RESPONSE', 'WAIT_RESPONSE'])) {
+          const status = this.orderStatusOf(order)
+          const group = chefOrderStatusGroup(status)
+          if (group === 'response') {
             result.waitResponse += 1
           }
-          if (this.isStatus(status, ['QUOTE_DISPUTE', 'QUOTE_OBJECTION', 'DISPUTE'])) {
+          if (group === 'dispute') {
             result.dispute += 1
           }
-          if (this.isStatus(status, ['WAIT_SERVICE', 'PENDING_SERVICE']) && this.isToday(this.getOrderTime(order))) {
+          if (group === 'service' && this.isToday(this.getOrderTime(order))) {
             result.todayService += 1
           }
-          if (this.isStatus(status, ['FINISHED', 'COMPLETED', 'DONE']) && this.formatMonth(this.getOrderTime(order)) === monthKey) {
+          if (orderStatus.isCompletedOrder(status) && this.formatMonth(this.getOrderTime(order)) === monthKey) {
             result.monthDone += 1
           }
           return result
@@ -209,14 +206,15 @@
     },
     methods: {
       loadPage() {
+        this.redirectingToMine = false
         this.loading = true
-        this.loadChef().then(() => {
+        return this.loadChef().then(() => {
           if (this.isChefWorkbenchAvailable) {
             return Promise.all([this.loadOrders(), this.loadAnnouncements()])
           }
           this.orders = []
           this.announcements = []
-          return null
+          return this.redirectNonWorkbenchUser()
         }).finally(() => {
           this.loading = false
         })
@@ -247,6 +245,24 @@
         }).catch(() => {
           this.announcements = []
         })
+      },
+      redirectNonWorkbenchUser() {
+        if (this.redirectingToMine) return Promise.resolve()
+        this.redirectingToMine = true
+        uni.showToast({
+          title: '请前往“我的”申请或查看资料',
+          icon: 'none'
+        })
+        if (this.$tab && typeof this.$tab.switchTab === 'function') {
+          this.$tab.switchTab('/pages/mine/index')
+          return Promise.resolve()
+        }
+        if (typeof uni.switchTab === 'function') {
+          return Promise.resolve(uni.switchTab({
+            url: '/pages/mine/index'
+          }))
+        }
+        return Promise.resolve()
       },
       formatAnnouncement(item) {
         if (typeof item === 'string') return item
@@ -281,11 +297,10 @@
         if (data && Array.isArray(data.records)) return data.records
         return []
       },
-      normalizeStatus(status) {
-        return String(status || '').trim().toUpperCase()
-      },
-      isStatus(status, values) {
-        return values.indexOf(status) > -1
+      orderStatusOf(order) {
+        if (!order) return ''
+        if (order.status !== undefined && order.status !== null && order.status !== '') return order.status
+        return order.orderStatus
       },
       getOrderTime(order) {
         return order.serviceStartTime || order.appointmentTime || order.bookingTime || order.startTime || order.reserveTime || ''

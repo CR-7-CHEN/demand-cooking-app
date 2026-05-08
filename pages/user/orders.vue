@@ -38,6 +38,7 @@
   import { getChefMy } from '@/api/cooking/chef'
   import { getToken } from '@/utils/auth'
   const chefStatus = require('@/utils/chef-status')
+  const orderStatus = require('@/utils/order-status')
   const orderTabs = require('@/utils/user-order-tabs')
 
   export default {
@@ -83,7 +84,8 @@
       loadOrders() {
         this.loading = true
         return listMyOrders({
-          statusGroup: this.activeStatus
+          statusGroup: this.activeStatus,
+          statuses: orderTabs.statusesOfTab(this.activeStatus)
         }).then(res => {
           this.orders = this.pickList(res).map(this.normalizeOrder)
         }).catch(() => {
@@ -118,7 +120,7 @@
         }
       },
       normalizeStatus(status) {
-        return orderTabs.normalizeStatus(status)
+        return orderStatus.normalizeOrderStatus(status)
       },
       chefDisplayName(order) {
         return order.chefName || (order.chef && order.chef.name) || '待确认'
@@ -135,7 +137,15 @@
         this.$tab.navigateTo(`/pages/user/order-detail?id=${order.id}`)
       },
       statusText(status) {
+        const normalized = orderStatus.normalizeOrderStatus(status)
+        const rawStatus = String(status || '').trim().toUpperCase()
         const map = {
+          [orderStatus.ORDER_STATUS.WAITING_RESPONSE]: '待响应',
+          [orderStatus.ORDER_STATUS.WAITING_PAY]: '待支付',
+          [orderStatus.ORDER_STATUS.PRICE_OBJECTION]: '异议中',
+          [orderStatus.ORDER_STATUS.WAITING_SERVICE]: '待服务',
+          [orderStatus.ORDER_STATUS.WAITING_CONFIRM]: '待确认',
+          [orderStatus.ORDER_STATUS.COMPLETED]: '已完成',
           WAITING_RESPONSE: '待响应',
           REJECTED_CLOSED: '已拒绝',
           RESPONSE_TIMEOUT_CLOSED: '响应超时关闭',
@@ -151,7 +161,7 @@
           REFUNDED: '已退款',
           REFUND_FAILED: '退款失败'
         }
-        return map[status] || status || '未知'
+        return map[normalized] || map[rawStatus] || normalized || status || '未知'
       }
     }
   }

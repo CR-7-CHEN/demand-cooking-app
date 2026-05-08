@@ -51,6 +51,7 @@
     submitReview,
     submitComplaint
   } from '@/api/cooking/user'
+  const orderStatus = require('@/utils/order-status')
 
   export default {
     data() {
@@ -66,22 +67,27 @@
     },
     computed: {
       canPay() {
-        return ['WAITING_PAY', 'PRICE_OBJECTION'].indexOf(this.order.status) !== -1
+        return orderStatus.isOrderStatus(this.order.status, orderStatus.ORDER_STATUS.WAITING_PAY) ||
+          orderStatus.isOrderStatus(this.order.status, orderStatus.ORDER_STATUS.PRICE_OBJECTION)
       },
       canObjection() {
-        return this.order.status === 'WAITING_PAY' && Number(this.order.objectionCount || 0) === 0
+        return orderStatus.isOrderStatus(this.order.status, orderStatus.ORDER_STATUS.WAITING_PAY) &&
+          Number(this.order.objectionCount || 0) === 0
       },
       canCancel() {
-        return ['WAITING_RESPONSE', 'WAITING_PAY', 'PRICE_OBJECTION', 'WAITING_SERVICE'].indexOf(this.order.status) !== -1
+        return orderStatus.isOrderStatus(this.order.status, orderStatus.ORDER_STATUS.WAITING_RESPONSE) ||
+          orderStatus.isOrderStatus(this.order.status, orderStatus.ORDER_STATUS.WAITING_PAY) ||
+          orderStatus.isOrderStatus(this.order.status, orderStatus.ORDER_STATUS.PRICE_OBJECTION) ||
+          orderStatus.isOrderStatus(this.order.status, orderStatus.ORDER_STATUS.WAITING_SERVICE)
       },
       canConfirm() {
-        return this.order.status === 'WAITING_CONFIRM'
+        return orderStatus.isOrderStatus(this.order.status, orderStatus.ORDER_STATUS.WAITING_CONFIRM)
       },
       canReview() {
-        return this.order.status === 'COMPLETED' && !this.order.reviewId
+        return orderStatus.isCompletedOrder(this.order.status) && !this.order.reviewId
       },
       canComplaint() {
-        return this.order.status === 'COMPLETED' && !this.order.complaintId
+        return orderStatus.isCompletedOrder(this.order.status) && !this.order.complaintId
       },
       panelTitle() {
         const map = {
@@ -124,7 +130,15 @@
         }
       },
       statusText(status) {
+        const normalized = orderStatus.normalizeOrderStatus(status)
+        const rawStatus = String(status || '').trim().toUpperCase()
         const map = {
+          [orderStatus.ORDER_STATUS.WAITING_RESPONSE]: '待做饭人员响应',
+          [orderStatus.ORDER_STATUS.WAITING_PAY]: '待用户支付',
+          [orderStatus.ORDER_STATUS.PRICE_OBJECTION]: '报价异议中',
+          [orderStatus.ORDER_STATUS.WAITING_SERVICE]: '待服务',
+          [orderStatus.ORDER_STATUS.WAITING_CONFIRM]: '待用户确认',
+          [orderStatus.ORDER_STATUS.COMPLETED]: '已完成',
           WAITING_RESPONSE: '待做饭人员响应',
           REJECTED_CLOSED: '做饭人员已拒绝',
           RESPONSE_TIMEOUT_CLOSED: '响应超时关闭',
@@ -140,7 +154,7 @@
           REFUNDED: '已退款',
           REFUND_FAILED: '退款失败'
         }
-        return map[status] || status || '未知状态'
+        return map[normalized] || map[rawStatus] || normalized || status || '未知状态'
       },
       pay() {
         payOrderSuccess({ orderId: this.order.id }).then(() => {

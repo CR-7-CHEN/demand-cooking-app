@@ -45,6 +45,18 @@
 
 <script>
   import { getChefOrderList } from '@/api/cooking/chef'
+  const orderStatus = require('@/utils/order-status')
+  const CHEF_ORDER_GROUP_MAP = {
+    [orderStatus.ORDER_STATUS.WAITING_RESPONSE]: 'response',
+    [orderStatus.ORDER_STATUS.PRICE_OBJECTION]: 'dispute',
+    [orderStatus.ORDER_STATUS.WAITING_SERVICE]: 'service',
+    [orderStatus.ORDER_STATUS.WAITING_CONFIRM]: 'confirm',
+    [orderStatus.ORDER_STATUS.COMPLETED]: 'done'
+  }
+
+  function chefOrderStatusGroup(status) {
+    return CHEF_ORDER_GROUP_MAP[orderStatus.normalizeOrderStatus(status)] || ''
+  }
 
   export default {
     data() {
@@ -103,17 +115,13 @@
         if (data && Array.isArray(data.records)) return data.records
         return []
       },
-      normalize(value) {
-        return String(value || '').trim().toUpperCase()
+      orderStatusOf(order) {
+        if (!order) return ''
+        if (order.status !== undefined && order.status !== null && order.status !== '') return order.status
+        return order.orderStatus
       },
       tabOf(order) {
-        const status = this.normalize(order.status || order.orderStatus)
-        if (['WAITING_RESPONSE', 'WAIT_CHEF_RESPONSE', 'PENDING_RESPONSE', 'WAIT_RESPONSE'].indexOf(status) > -1) return 'response'
-        if (['QUOTE_DISPUTE', 'QUOTE_OBJECTION', 'DISPUTE'].indexOf(status) > -1) return 'dispute'
-        if (['WAIT_SERVICE', 'PENDING_SERVICE'].indexOf(status) > -1) return 'service'
-        if (['WAIT_USER_CONFIRM', 'PENDING_CONFIRM', 'WAIT_CONFIRM'].indexOf(status) > -1) return 'confirm'
-        if (['FINISHED', 'COMPLETED', 'DONE'].indexOf(status) > -1) return 'done'
-        return 'all'
+        return chefOrderStatusGroup(this.orderStatusOf(order)) || 'all'
       },
       statusText(order) {
         const map = {

@@ -81,6 +81,18 @@
     serviceCompleteChefOrder,
     cancelChefOrder
   } from '@/api/cooking/chef'
+  const orderStatus = require('@/utils/order-status')
+  const CHEF_ORDER_GROUP_MAP = {
+    [orderStatus.ORDER_STATUS.WAITING_RESPONSE]: 'response',
+    [orderStatus.ORDER_STATUS.PRICE_OBJECTION]: 'dispute',
+    [orderStatus.ORDER_STATUS.WAITING_SERVICE]: 'service',
+    [orderStatus.ORDER_STATUS.WAITING_CONFIRM]: 'confirm',
+    [orderStatus.ORDER_STATUS.COMPLETED]: 'done'
+  }
+
+  function chefOrderStatusGroup(status) {
+    return CHEF_ORDER_GROUP_MAP[orderStatus.normalizeOrderStatus(status)] || ''
+  }
 
   export default {
     data() {
@@ -98,15 +110,10 @@
     },
     computed: {
       status() {
-        return this.normalize(this.order.status || this.order.orderStatus)
+        return this.orderStatusOf(this.order)
       },
       group() {
-        if (['WAITING_RESPONSE', 'WAIT_CHEF_RESPONSE', 'PENDING_RESPONSE', 'WAIT_RESPONSE'].indexOf(this.status) > -1) return 'response'
-        if (['QUOTE_DISPUTE', 'QUOTE_OBJECTION', 'DISPUTE'].indexOf(this.status) > -1) return 'dispute'
-        if (['WAIT_SERVICE', 'PENDING_SERVICE'].indexOf(this.status) > -1) return 'service'
-        if (['WAIT_USER_CONFIRM', 'PENDING_CONFIRM', 'WAIT_CONFIRM'].indexOf(this.status) > -1) return 'confirm'
-        if (['FINISHED', 'COMPLETED', 'DONE'].indexOf(this.status) > -1) return 'done'
-        return 'other'
+        return chefOrderStatusGroup(this.status) || 'other'
       },
       statusText() {
         const map = {
@@ -154,8 +161,10 @@
           this.quoteForm.quoteRemark = this.order.quoteRemark || this.order.quoteDescription || ''
         })
       },
-      normalize(value) {
-        return String(value || '').trim().toUpperCase()
+      orderStatusOf(order) {
+        if (!order) return ''
+        if (order.status !== undefined && order.status !== null && order.status !== '') return order.status
+        return order.orderStatus
       },
       getTime(order) {
         return order.serviceStartTime || order.appointmentTime || order.bookingTime || order.startTime || order.reserveTime || ''

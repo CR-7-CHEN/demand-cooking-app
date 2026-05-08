@@ -13,20 +13,29 @@ test('exposes four user order tabs in requested order', () => {
 });
 
 test('maps user order statuses into the expected tab groups', () => {
-  assert.equal(orderTabs.tabOfStatus('WAITING_RESPONSE'), 'reserved');
-  assert.equal(orderTabs.tabOfStatus('WAITING_PAY'), 'payment');
-  assert.equal(orderTabs.tabOfStatus('PRICE_OBJECTION'), 'payment');
-  assert.equal(orderTabs.tabOfStatus('WAITING_SERVICE'), 'serving');
-  assert.equal(orderTabs.tabOfStatus('WAITING_CONFIRM'), 'serving');
-  assert.equal(orderTabs.tabOfStatus('COMPLETED'), 'completed');
-  assert.equal(orderTabs.tabOfStatus('REJECTED_CLOSED'), 'completed');
-  assert.equal(orderTabs.tabOfStatus('REFUNDING'), 'completed');
+  assert.equal(orderTabs.tabOfUserStatus(0), 'reserved');
+  assert.equal(orderTabs.tabOfUserStatus('WAITING_RESPONSE'), 'reserved');
+  assert.equal(orderTabs.tabOfUserStatus(1), 'payment');
+  assert.equal(orderTabs.tabOfUserStatus('PRICE_OBJECTION'), 'payment');
+  assert.equal(orderTabs.tabOfUserStatus(3), 'serving');
+  assert.equal(orderTabs.tabOfUserStatus('WAITING_CONFIRM'), 'serving');
+  assert.equal(orderTabs.tabOfUserStatus(5), 'completed');
+  assert.equal(orderTabs.tabOfUserStatus('COMPLETED'), 'completed');
+  assert.equal(orderTabs.tabOfUserStatus('REJECTED_CLOSED'), '');
+  assert.equal(orderTabs.tabOfUserStatus('REFUNDING'), '');
+  assert.equal(orderTabs.tabOfUserStatus('UNKNOWN_STATUS'), '');
 });
 
-test('returns backend status groups for each tab', () => {
-  assert.deepEqual(orderTabs.statusesOfTab('reserved'), ['WAITING_RESPONSE']);
-  assert.deepEqual(orderTabs.statusesOfTab('payment'), ['WAITING_PAY', 'PRICE_OBJECTION']);
-  assert.deepEqual(orderTabs.statusesOfTab('serving'), ['WAITING_SERVICE', 'WAITING_CONFIRM']);
-  assert.ok(orderTabs.statusesOfTab('completed').includes('COMPLETED'));
-  assert.ok(orderTabs.statusesOfTab('completed').includes('CANCELED'));
+test('returns numeric query status groups for each tab', () => {
+  assert.deepEqual(orderTabs.statusesOfUserTab('reserved'), [0]);
+  assert.deepEqual(orderTabs.statusesOfUserTab('payment'), [1, 2]);
+  assert.deepEqual(orderTabs.statusesOfUserTab('serving'), [3, 4]);
+  assert.deepEqual(orderTabs.statusesOfUserTab('completed'), [5]);
+  assert.deepEqual(orderTabs.statusesOfUserTab('unknown'), []);
+});
+
+test('keeps legacy tab helper aliases on the same numeric behavior', () => {
+  assert.deepEqual(orderTabs.statusesOfTab('completed'), [5]);
+  assert.equal(orderTabs.tabOfStatus('COMPLETED'), 'completed');
+  assert.equal(orderTabs.tabOfStatus('CANCELED'), '');
 });

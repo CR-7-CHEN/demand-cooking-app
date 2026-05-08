@@ -250,6 +250,8 @@
         const month = this.formatMonth(rawMonth)
         const id = this.firstValue(item, [
           'id',
+          'settlementNo',
+          'settlementCode',
           'settlementId',
           'recordId',
           'monthId',
@@ -269,8 +271,11 @@
           month: month || '未知月份',
           completeCount: this.normalizeNumber(this.firstValue(item, [
             'completeCount',
+            'completedCount',
             'completedOrderCount',
             'finishedCount',
+            'finishedOrderCount',
+            'completedOrders',
             'orderCount'
           ])),
           payableAmount: this.normalizeNumber(this.firstValue(item, [
@@ -338,6 +343,7 @@
       formatMonth(value) {
         if (!value) return ''
         const text = String(value).trim()
+        if (/^\d{6}$/.test(text)) return `${text.slice(0, 4)}-${text.slice(4, 6)}`
         if (/^\d{4}-\d{2}$/.test(text)) return text
         if (/^\d{4}\/\d{2}$/.test(text)) return text.replace('/', '-')
 

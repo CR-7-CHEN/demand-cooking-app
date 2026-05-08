@@ -214,7 +214,7 @@
         return '\u8be5\u6708\u4efd\u6682\u65e0\u5df2\u5b8c\u6210\u4e14\u53ef\u8ba1\u5165\u7ed3\u7b97\u7684\u8ba2\u5355\u3002'
       },
       displayMonth() {
-        return this.value('settlementMonth', 'month') || this.queryMonth
+        return this.formatMonth(this.value('settlementMonth', 'month') || this.queryMonth)
       },
       hasSettlement() {
         return Object.keys(this.settlement || {}).some(key => {
@@ -248,7 +248,7 @@
       },
       settlementOrders() {
         const details = this.pickSettlementDetails()
-        const source = details.length ? details : this.orders.filter(item => this.isSettlementOrder(item))
+        const source = details.length ? details : this.orders.filter(item => this.orderBelongsToSettlement(item))
         return source.map((item, index) => this.normalizeOrder(item, index)).filter(item => item.id)
       },
       deductionLines() {
@@ -275,7 +275,7 @@
     },
     onLoad(options) {
       this.settlementId = options.id || options.settlementId || ''
-      this.queryMonth = options.month || options.settlementMonth || ''
+      this.queryMonth = this.formatMonth(options.month || options.settlementMonth || '')
       this.load()
     },
     onPullDownRefresh() {
@@ -286,7 +286,7 @@
     methods: {
       load() {
         this.loading = true
-        return Promise.all([this.loadSettlement(), this.loadOrders()]).finally(() => {
+        return this.loadSettlement().then(() => this.loadOrders()).finally(() => {
           this.loading = false
         })
       },
@@ -294,8 +294,9 @@
         if (!this.settlementId) return Promise.resolve()
         return getChefSettlementDetail(this.settlementId).then(res => {
           this.settlement = this.normalizeSettlement(res)
-          if (!this.queryMonth) {
-            this.queryMonth = this.value('settlementMonth', 'month') || this.queryMonth
+          const settlementMonth = this.value('settlementMonth', 'month')
+          if (settlementMonth) {
+            this.queryMonth = this.formatMonth(settlementMonth)
           }
         }).catch(() => {
           this.settlement = {}
@@ -344,6 +345,12 @@
         if (Array.isArray(details)) return details
         return []
       },
+      getSettlementScope() {
+        return {
+          settlementId: this.settlementId || this.value('id', 'settlementId', 'recordId', 'monthRecordId'),
+          month: this.displayMonth || this.value('settlementMonth', 'month')
+        }
+      },
       value() {
         for (let i = 0; i < arguments.length; i += 1) {
           const key = arguments[i]
@@ -356,6 +363,30 @@
       isSettlementOrder(order) {
         const status = this.normalizeStatus(order.status || order.orderStatus)
         return SETTLED_STATUSES.indexOf(status) > -1
+      },
+      orderBelongsToSettlement(order) {
+        if (!this.isSettlementOrder(order)) return false
+
+        const scope = this.getSettlementScope()
+        const orderSettlementId = this.firstOrderValue(order, ['settlementId', 'monthSettlementId', 'recordId'])
+        const orderMonth = this.getOrderMonth(order)
+
+        if (scope.settlementId && orderSettlementId) {
+          return String(orderSettlementId) === String(scope.settlementId)
+        }
+        if (scope.month && orderMonth) {
+          return orderMonth === scope.month
+        }
+        return false
+      },
+      firstOrderValue(order, keys) {
+        for (let i = 0; i < keys.length; i += 1) {
+          const value = order && order[keys[i]]
+          if (value !== undefined && value !== null && value !== '') {
+            return value
+          }
+        }
+        return ''
       },
       normalizeOrder(order, index) {
         const id = order.id || order.orderId || order.orderNo || order.orderCode || ('order-' + index)
@@ -376,12 +407,39 @@
       getOrderTime(order) {
         return order.serviceStartTime || order.appointmentStartTime || order.appointmentTime || order.bookingTime || order.startTime || order.reserveTime || ''
       },
+      getOrderMonth(order) {
+        const rawMonth = this.firstOrderValue(order, [
+          'settlementMonth',
+          'month',
+          'settleMonth',
+          'statMonth',
+          'billingMonth'
+        ])
+        if (rawMonth) {
+          return this.formatMonth(rawMonth)
+        }
+        return this.formatMonth(this.getOrderTime(order))
+      },
       getDishes(order) {
         const dishes = order.dishes || order.dishList || order.dishNames || order.dishSnapshot || order.menu
         if (Array.isArray(dishes)) {
           return dishes.map(item => typeof item === 'string' ? item : item.name || item.dishName).filter(Boolean).join('\u3001') || '\u672a\u586b\u5199'
         }
         return dishes || order.dishRemark || '\u672a\u586b\u5199'
+      },
+      formatMonth(value) {
+        if (!value) return ''
+        const text = String(value).trim()
+        if (/^\d{6}$/.test(text)) return `${text.slice(0, 4)}-${text.slice(4, 6)}`
+        if (/^\d{4}-\d{2}$/.test(text)) return text
+        if (/^\d{4}\/\d{2}$/.test(text)) return text.replace('/', '-')
+
+        const normalized = text.replace(/\./g, '-').replace(/\//g, '-')
+        const date = new Date(normalized.replace(/-/g, '/'))
+        if (Number.isNaN(date.getTime())) return text.slice(0, 7).replace('/', '-')
+
+        const month = date.getMonth() + 1
+        return `${date.getFullYear()}-${month < 10 ? '0' + month : month}`
       },
       money(value) {
         const number = Number(value || 0)

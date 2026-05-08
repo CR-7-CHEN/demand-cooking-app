@@ -19,7 +19,8 @@
       <view v-if="showChefRecommendations" class="search-panel">
         <view class="search-row">
           <uni-icons type="search" size="18" color="#f06a3a"></uni-icons>
-          <input v-model="query.keyword" confirm-type="search" placeholder="搜索姓名、菜系、区域" @confirm="loadChefs" />
+          <input v-model="query.keyword" confirm-type="search" placeholder="搜索姓名、菜系" @confirm="loadChefs" />
+          <button class="search-button" @click="loadChefs">筛选</button>
         </view>
         <view class="filter-row">
           <picker
@@ -36,10 +37,12 @@
               <text class="region-value" :class="{ placeholder: !query.serviceArea }">
                 {{ serviceAreaLabel || query.serviceArea || '选择服务区域' }}
               </text>
-              <uni-icons :type="regionPickerOpen ? 'top' : 'bottom'" size="14" color="#8a8f98"></uni-icons>
+              <view v-if="query.serviceArea" class="region-clear" @tap.stop="clearServiceArea">
+                <uni-icons type="clear" size="14" color="#8a8f98"></uni-icons>
+              </view>
+              <uni-icons v-else :type="regionPickerOpen ? 'top' : 'bottom'" size="14" color="#8a8f98"></uni-icons>
             </view>
           </picker>
-          <button @click="loadChefs">筛选</button>
         </view>
         <view class="meal-period-row">
           <text
@@ -144,8 +147,11 @@
             <text>评分 {{ chef.rating }}</text>
             <text>{{ chef.completedCount }} 单</text>
           </view>
-          <view class="tag-row">
-            <text v-for="item in chef.cuisines" :key="item" class="tag">{{ item }}</text>
+          <view v-if="chef.cuisines.length" class="cuisine-block">
+            <text class="cuisine-label">擅长菜系</text>
+            <view class="tag-row">
+              <text v-for="item in chef.cuisines" :key="item" class="tag">{{ item }}</text>
+            </view>
           </view>
           <view v-if="chef.serviceAreaText" class="area-row">
             <uni-icons type="location" size="14" color="#8a8f98"></uni-icons>
@@ -300,7 +306,7 @@
         this.loading = true
         listChefs({
           keyword: this.query.keyword,
-          serviceArea: this.query.serviceArea,
+          areaName: this.query.serviceArea,
           mealPeriod: this.query.mealPeriod
         }).then(res => {
           this.chefs = this.pickList(res).map(this.normalizeChef)
@@ -350,6 +356,13 @@
         this.regionValue = region
         this.serviceAreaLabel = region.filter(Boolean).join(' ')
         this.query.serviceArea = region[2] || region[1] || region[0] || ''
+        this.loadChefs()
+      },
+      clearServiceArea() {
+        this.regionPickerOpen = false
+        this.regionValue = []
+        this.serviceAreaLabel = ''
+        this.query.serviceArea = ''
         this.loadChefs()
       },
       buildRegionColumns(index) {
@@ -416,7 +429,7 @@
         return value
       },
       normalizeChef(item) {
-        const cuisines = this.toArray(item.cuisines || item.cuisine || item.specialties || item.goodAt)
+        const cuisines = this.toArray(item.cuisines || item.cuisine || item.specialties || item.goodAt || item.skillTags || item.cuisineTags)
         const areas = this.toArray(item.serviceAreas || item.serviceArea || item.serviceAreaNames || item.area)
         const rawGender = item.gender === undefined || item.gender === null ? item.sex : item.gender
         const rawAge = item.age === undefined || item.age === null ? (item.ageText === undefined || item.ageText === null ? item.ageValue : item.ageText) : item.age
@@ -463,7 +476,7 @@
       toArray(value) {
         if (!value) return []
         if (Array.isArray(value)) return value.filter(Boolean)
-        return String(value).split(/[、,，\s]+/).filter(Boolean)
+        return String(value).split(/[、,，/／\s]+/).filter(Boolean)
       },
       formatMoney(value) {
         const amount = Number(value)
@@ -642,10 +655,21 @@
     color: #999;
   }
 
-  .filter-row button {
+  .region-clear {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    min-width: 28rpx;
+    min-height: 28rpx;
+  }
+
+  .search-button {
+    flex-shrink: 0;
     width: 120rpx;
     height: 56rpx;
     line-height: 56rpx;
+    margin: 0;
     padding: 0;
     border-radius: 8rpx;
     color: #fff;
@@ -718,7 +742,7 @@
     align-items: center;
     justify-content: space-between;
     gap: 20rpx;
-    padding: 28rpx;
+    padding: 28rpx 0rpx 28rpx 28rpx;
     color: #7a351b;
     background: linear-gradient(135deg, #fff2e4 0%, #ffe1c8 100%);
   }
@@ -1007,10 +1031,20 @@
     font-size: 24rpx;
   }
 
+  .cuisine-block {
+    margin-top: 14rpx;
+  }
+
+  .cuisine-label {
+    display: block;
+    color: #69736e;
+    font-size: 24rpx;
+  }
+
   .tag-row {
     flex-wrap: wrap;
     gap: 10rpx;
-    margin-top: 14rpx;
+    margin-top: 10rpx;
   }
 
   .tag {

@@ -43,6 +43,15 @@
             <view>编辑资料</view>
           </view>
         </view>
+        <view v-if="chefEntry" class="list-cell list-cell-arrow" @click="handleChefEntry">
+          <view class="menu-item-box">
+            <view class="iconfont icon-people menu-icon"></view>
+            <view class="chef-entry-box">
+              <view>{{ chefEntry.title }}</view>
+              <view class="chef-entry-desc">{{ chefEntry.description }}</view>
+            </view>
+          </view>
+        </view>
         <view class="list-cell list-cell-arrow" @click="handleHelp">
           <view class="menu-item-box">
             <view class="iconfont icon-help menu-icon"></view>
@@ -69,21 +78,29 @@
 
 <script>
   import { getAppProfile } from "@/api/system/user"
+  import { getChefMy } from "@/api/cooking/chef"
+  const chefStatus = require('@/utils/chef-status')
 
   export default {
     data() {
       return {
         name: this.$store.state.user.name,
-        nickName: ''
+        nickName: '',
+        chef: {}
       }
     },
     onShow() {
       this.name = this.$store.state.user.name
       this.getProfile()
+      this.loadChefProfile()
     },
     computed: {
       avatar() {
         return this.$store.state.user.avatar
+      },
+      chefEntry() {
+        if (!this.$store.state.user.token) return null
+        return this.resolveChefEntry(this.chef)
       },
       windowHeight() {
         return uni.getSystemInfoSync().windowHeight - 50
@@ -111,12 +128,61 @@
       handleAbout() {
         this.$tab.navigateTo('/pages/mine/about/index')
       },
+      handleChefEntry() {
+        if (!this.$store.state.user.token) {
+          this.handleToLogin()
+          return
+        }
+        this.$tab.navigateTo('/pages/work/profile')
+      },
       getProfile() {
         if (!this.$store.state.user.token) return
         getAppProfile().then(response => {
           const user = response.data || {}
           this.nickName = user.nickName || ''
         }).catch(() => {})
+      },
+      loadChefProfile() {
+        if (!this.$store.state.user.token) {
+          this.chef = {}
+          return
+        }
+        getChefMy().then(response => {
+          this.chef = response && response.data ? response.data : {}
+        }).catch(() => {
+          this.chef = {}
+        })
+      },
+      resolveChefEntry(chef) {
+        if (chefStatus.isChefWorkbenchAvailable(chef)) return null
+        if (chefStatus.needChefApply(chef)) {
+          return {
+            title: '申请成为做饭人员',
+            description: '提交做饭人员资料并等待审核'
+          }
+        }
+        if (chefStatus.isChefPending(chef)) {
+          return {
+            title: '查看申请进度',
+            description: '审核中，可查看已提交的做饭人员资料'
+          }
+        }
+        if (chefStatus.isChefRejected(chef)) {
+          return {
+            title: '完善做饭人员资料',
+            description: '根据驳回原因修改资料后重新提交'
+          }
+        }
+        if (chefStatus.hasChefProfile(chef)) {
+          return {
+            title: '查看做饭人员资料',
+            description: '工作台暂不可用，可查看或完善入驻资料'
+          }
+        }
+        return {
+          title: '申请成为做饭人员',
+          description: '提交做饭人员资料并等待审核'
+        }
       },
       handleBuilding() {
         this.$modal.showToast('模块建设中~')
@@ -195,6 +261,17 @@
             margin: 8px 0px;
           }
         }
+      }
+
+      .chef-entry-box {
+        display: flex;
+        flex-direction: column;
+      }
+
+      .chef-entry-desc {
+        margin-top: 4px;
+        font-size: 12px;
+        color: #8a8a8a;
       }
     }
   }
