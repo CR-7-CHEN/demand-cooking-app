@@ -44,6 +44,15 @@ test('order detail action guards use normalized status helpers instead of inline
   assert.match(computedBlock(detailSource, 'canComplaint'), /isCompletedOrder/);
 });
 
+test('user order detail hides cancel entry after backend marks service as started', () => {
+  assert.match(detailSource, /hasServiceStarted\(\)/);
+  assert.match(detailSource, /serviceStartedTime/);
+  assert.match(detailSource, /serviceStarted/);
+  assert.match(computedBlock(detailSource, 'canCancel'), /ORDER_STATUS\.WAITING_SERVICE/);
+  assert.match(computedBlock(detailSource, 'canCancel'), /!this\.hasServiceStarted/);
+  assert.doesNotMatch(computedBlock(detailSource, 'canCancel'), /ORDER_STATUS\.WAITING_SERVICE\)\s*$/m);
+});
+
 test('order list query uses tab helper status arrays and status text normalizes status first', () => {
   assert.match(ordersSource, /statuses:\s*orderTabs\.statusesOfTab\(this\.activeStatus\)/);
   assert.match(ordersSource, /statusGroup:\s*this\.activeStatus/);

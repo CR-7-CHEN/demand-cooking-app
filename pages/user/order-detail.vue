@@ -78,10 +78,13 @@
         return orderStatus.isOrderStatus(this.order.status, orderStatus.ORDER_STATUS.WAITING_RESPONSE) ||
           orderStatus.isOrderStatus(this.order.status, orderStatus.ORDER_STATUS.WAITING_PAY) ||
           orderStatus.isOrderStatus(this.order.status, orderStatus.ORDER_STATUS.PRICE_OBJECTION) ||
-          orderStatus.isOrderStatus(this.order.status, orderStatus.ORDER_STATUS.WAITING_SERVICE)
+          (orderStatus.isOrderStatus(this.order.status, orderStatus.ORDER_STATUS.WAITING_SERVICE) && !this.hasServiceStarted)
       },
       canConfirm() {
         return orderStatus.isOrderStatus(this.order.status, orderStatus.ORDER_STATUS.WAITING_CONFIRM)
+      },
+      hasServiceStarted() {
+        return !!this.getServiceStartedTime(this.order) || this.order.serviceStarted === true || this.order.serviceStarted === 1 || this.order.serviceStarted === '1'
       },
       canReview() {
         return orderStatus.isCompletedOrder(this.order.status) && !this.order.reviewId
@@ -128,6 +131,10 @@
           addressText: address,
           dishText: data.dishText || data.dishesText || data.customDishNames
         }
+      },
+      getServiceStartedTime(order) {
+        if (!order) return ''
+        return order.serviceStartedTime || order.serviceStartedAt || ''
       },
       statusText(status) {
         const normalized = orderStatus.normalizeOrderStatus(status)

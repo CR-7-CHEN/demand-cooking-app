@@ -3,27 +3,30 @@
     <view class="form-card">
       <view class="section-head">
         <view>
-          <view class="section-title">可预约时间</view>
-          <view class="section-desc">设置后会和入驻资料一起提交审核</view>
+          <view class="section-title">{{ sectionTitle }}</view>
+          <view v-if="sectionDesc" class="section-desc">{{ sectionDesc }}</view>
         </view>
       </view>
-
-      <view v-if="chefTimes.length" class="time-list">
+      <view v-if="loading" class="empty-time">正在加载可预约时间...</view>
+      <view v-else-if="chefTimes.length" class="time-list">
         <view v-for="item in chefTimes" :key="item.localId || item.timeId" class="time-row">
           <view class="time-info">
             <text class="time-range">{{ formatTimeRange(item) }}</text>
-            <text :class="['time-status', item.status === '1' ? 'off' : 'on']">{{ timeStatusText(item.status) }}</text>
+            <view class="time-badges">
+              <text :class="['time-status', item.status === '1' ? 'off' : 'on']">{{ timeStatusText(item.status) }}</text>
+              <text v-if="isExpiredTime(item)" class="time-expired-tag">已过期</text>
+            </view>
             <text v-if="item.remark" class="time-remark">{{ item.remark }}</text>
           </view>
           <view class="time-actions">
-            <text class="text-action" @click="editTime(item)">编辑</text>
-            <text class="text-action danger" @click="removeTime(item)">删除</text>
+            <text v-if="!isManageMode" class="text-action" @click="editTime(item)">编辑</text>
+            <text v-if="!isManageMode || isExpiredTime(item)" class="text-action danger" @click="removeTime(item)">删除</text>
           </view>
         </view>
       </view>
-      <view v-else class="empty-time">暂无可预约时间，请选择下方日期和时间</view>
+      <view v-else class="empty-time">{{ emptyTimeText }}</view>
 
-      <view class="time-form">
+      <view v-if="!isManageMode" class="time-form">
         <view class="field">
           <text class="label">日期</text>
           <picker mode="date" :value="timeForm.date" @change="onTimeDateChange">
@@ -59,11 +62,13 @@
       </view>
     </view>
 
-    <button class="submit" @click="confirmTimes">确认</button>
+    <button v-if="!isManageMode" class="submit" @click="confirmTimes">确认</button>
   </view>
 </template>
 
 <script>
+  import { getChefTime, deleteChefTime } from '@/api/cooking/chef'
+
   const AVAILABLE_TIME_DRAFT_KEY = 'work_profile_available_time_draft'
   const AVAILABLE_TIME_RESULT_KEY = 'work_profile_available_time_result'
   const MEAL_OPTIONS = ['早餐', '午餐', '晚餐']
@@ -71,6 +76,9 @@
   export default {
     data() {
       return {
+        mode: 'draft',
+        focus: '',
+        loading: false,
         chefTimes: [],
         mealOptions: MEAL_OPTIONS,
         timeStatusOptions: [
@@ -89,6 +97,18 @@
       }
     },
     computed: {
+      isManageMode() {
+        return this.mode === 'manage'
+      },
+      sectionTitle() {
+        return this.isManageMode ? '预约时间管理' : '可预约时间'
+      },
+      sectionDesc() {
+        return this.isManageMode ? '' : '设置后会和入驻资料一起提交审核'
+      },
+      emptyTimeText() {
+        return this.isManageMode ? '暂无可清理的预约时间段' : '暂无可预约时间，请选择下方日期和时间'
+      },
       timeStatusIndex() {
         const index = this.timeStatusOptions.findIndex(item => item.value === this.timeForm.status)
         return index > -1 ? index : 0
@@ -98,29 +118,62 @@
         return index > -1 ? index : 0
       }
     },
-    onLoad() {
-      this.loadDraft()
+    onLoad(options = {}) {
+      this.mode = options.mode === 'manage' ? 'manage' : 'draft'
+      this.focus = options.focus || ''
+      return this.loadPage()
     },
     methods: {
+      loadPage() {
+        return this.isManageMode ? this.loadManageTimes() : this.loadDraft()
+      },
       loadDraft() {
         const draft = uni.getStorageSync(AVAILABLE_TIME_DRAFT_KEY)
         this.chefTimes = this.toTimeList(Array.isArray(draft) ? draft : [])
+        return Promise.resolve(this.chefTimes)
+      },
+      loadManageTimes() {
+        this.loading = true
+        return getChefTime({}).then(res => {
+          this.chefTimes = this.toTimeList(this.pickList(res))
+        }).catch(() => {
+          this.chefTimes = []
+        }).finally(() => {
+          this.loading = false
+        })
       },
       toTimeList(list) {
         return list.map(item => this.normalizeTimeItem(item))
           .filter(item => item.startTime && item.endTime)
-          .sort((a, b) => String(a.startTime || '').localeCompare(String(b.startTime || '')))
+          .sort((a, b) => {
+            if (this.isManageMode) {
+              const aExpired = this.isExpiredTime(a)
+              const bExpired = this.isExpiredTime(b)
+              if (aExpired !== bExpired) return aExpired ? -1 : 1
+            }
+            return String(a.startTime || '').localeCompare(String(b.startTime || ''))
+          })
       },
       normalizeTimeItem(item) {
-        const localId = item.localId || item.timeId || this.createLocalId()
+        const localId = item.localId || item.timeId || item.id || this.createLocalId()
         return {
           localId: String(localId),
-          timeId: item.timeId || null,
+          timeId: item.timeId || item.id || null,
           startTime: item.startTime || '',
           endTime: item.endTime || '',
           status: item.status || '0',
           remark: this.normalizeMealRemark(item.remark)
         }
+      },
+      pickList(res) {
+        if (Array.isArray(res)) return res
+        if (res && Array.isArray(res.rows)) return res.rows
+        if (res && Array.isArray(res.records)) return res.records
+        if (res && Array.isArray(res.data)) return res.data
+        if (res && res.data && Array.isArray(res.data.rows)) return res.data.rows
+        if (res && res.data && Array.isArray(res.data.records)) return res.data.records
+        if (res && res.data && Array.isArray(res.data.list)) return res.data.list
+        return []
       },
       normalizeMealRemark(value) {
         const remark = String(value || '').trim()
@@ -146,6 +199,12 @@
       },
       timeStatusText(status) {
         return status === '1' ? '停用' : '启用'
+      },
+      isExpiredTime(item) {
+        const endTime = item && item.endTime
+        if (!endTime) return false
+        const end = new Date(String(endTime).replace(/-/g, '/')).getTime()
+        return Number.isFinite(end) && end > 0 && end < Date.now()
       },
       onTimeDateChange(e) {
         this.timeForm.date = e.detail.value
@@ -228,7 +287,13 @@
         return true
       },
       removeTime(item) {
+        if (this.isManageMode && !this.isExpiredTime(item)) return
         this.$modal.confirm('确认删除该可预约时间段吗？').then(() => {
+          if (this.isManageMode && item.timeId) {
+            return deleteChefTime(item.timeId).then(() => {
+              this.chefTimes = this.chefTimes.filter(time => time.localId !== item.localId)
+            })
+          }
           this.chefTimes = this.chefTimes.filter(time => time.localId !== item.localId)
         })
       },
@@ -237,6 +302,10 @@
         return this.upsertTimeForm()
       },
       confirmTimes() {
+        if (this.isManageMode) {
+          uni.navigateBack()
+          return
+        }
         if (!this.flushTimeFormBeforeConfirm()) return
         uni.setStorageSync(AVAILABLE_TIME_RESULT_KEY, this.chefTimes)
         uni.removeStorageSync(AVAILABLE_TIME_DRAFT_KEY)
@@ -285,6 +354,16 @@
     line-height: 1.45;
   }
 
+  .manage-tip {
+    margin-top: 18rpx;
+    padding: 18rpx 20rpx;
+    border-radius: 8rpx;
+    background: #fff4e8;
+    color: #9a4c1e;
+    font-size: 24rpx;
+    line-height: 1.45;
+  }
+
   .time-list {
     margin-top: 22rpx;
     border-top: 1rpx solid #edf0ee;
@@ -309,6 +388,14 @@
     display: block;
   }
 
+  .time-badges {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10rpx;
+    margin-top: 8rpx;
+  }
+
   .time-range {
     color: #17211b;
     font-size: 27rpx;
@@ -317,7 +404,6 @@
 
   .time-status {
     display: inline-block;
-    margin-top: 8rpx;
     padding: 4rpx 10rpx;
     border-radius: 6rpx;
     font-size: 22rpx;
@@ -332,6 +418,16 @@
   .time-status.off {
     background: #edf0ee;
     color: #647068;
+  }
+
+  .time-expired-tag {
+    display: inline-block;
+    padding: 4rpx 10rpx;
+    border-radius: 6rpx;
+    background: #fff0ee;
+    color: #c24838;
+    font-size: 22rpx;
+    line-height: 1.2;
   }
 
   .time-remark {

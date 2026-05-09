@@ -61,7 +61,7 @@ function createPageContext(component, overrides = {}) {
   return ctx
 }
 
-test('mine page uses a dedicated apply card and hides workbench copy for ordinary users', () => {
+test('mine page hides the chef apply card for ordinary users', () => {
   assert.doesNotMatch(source, /v-if="chefEntry" class="list-cell/)
   assert.match(source, /v-if="chefAction" class="chef-action-card"/)
   assert.match(source, /uni\.showModal\(/)
@@ -75,8 +75,7 @@ test('mine page uses a dedicated apply card and hides workbench copy for ordinar
   const activeEntry = component.methods.resolveChefAction.call(ctx, { chefId: '1', auditStatus: '1', chefStatus: '0' })
   const profileEntry = component.methods.resolveChefAction.call(ctx, { chefId: '1', auditStatus: '1', chefStatus: '2' })
 
-  assert.equal(newEntry.title, '申请入驻')
-  assert.equal(newEntry.buttonText, '申请入驻')
+  assert.equal(newEntry, null)
   assert.equal(pendingEntry.buttonText, '查看进度')
   assert.equal(rejectedEntry.buttonText, '完善资料')
   assert.equal(profileEntry.title, '查看入驻资料')
@@ -84,7 +83,7 @@ test('mine page uses a dedicated apply card and hides workbench copy for ordinar
   assert.equal(activeEntry, null)
 })
 
-test('mine page apply action shows a modal before navigating to the profile form', () => {
+test('mine page ordinary user action does not open the apply flow', () => {
   const component = loadComponentOptions()
   const calls = []
   uniMock.showModal = options => {
@@ -103,8 +102,5 @@ test('mine page apply action shows a modal before navigating to the profile form
 
   component.methods.handleChefAction.call(ctx)
 
-  assert.deepEqual(calls[0][0], 'showModal')
-  assert.equal(calls[0][1], '申请入驻')
-  assert.equal(calls[1][0], 'navigateTo')
-  assert.equal(calls[1][1], '/pages/work/profile')
+  assert.deepEqual(calls, [])
 })

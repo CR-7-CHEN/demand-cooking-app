@@ -22,9 +22,12 @@
 
     <view class="card">
       <view class="card-title">预约参考</view>
-      <view class="info-row">
+      <view class="info-row info-row--link" @click="openAvailableTimePopup">
         <text class="info-label">可预约时间</text>
-        <text class="info-value">{{ chef.availableTimeText }}</text>
+        <view class="info-action">
+          <text class="info-value info-value--action">点击查看</text>
+          <uni-icons type="right" size="16" color="#9aa19c"></uni-icons>
+        </view>
       </view>
       <view class="info-row">
         <text class="info-label">价格预估</text>
@@ -35,19 +38,16 @@
     <view class="card">
       <view class="card-head">
         <view class="card-title">预约信息</view>
-        <button class="text-btn" @click="goAddress">管理地址</button>
+        <button class="text-btn" @click="goAddress">选择地址</button>
       </view>
 
-      <picker v-if="addresses.length" :range="addressOptions" @change="selectAddress">
-        <view class="select-box">
-          <view v-if="selectedAddress">
-            <view class="select-title">{{ selectedAddress.contactName }} {{ selectedAddress.phone }}</view>
-            <view class="select-sub">{{ selectedAddress.fullAddress }}</view>
-          </view>
-          <view v-else class="placeholder">请选择上门地址</view>
-          <uni-icons type="right" size="16" color="#9aa19c"></uni-icons>
+      <view v-if="addresses.length" class="select-box">
+        <view v-if="selectedAddress">
+          <view class="select-title">{{ selectedAddress.contactName }} {{ selectedAddress.phone }}</view>
+          <view class="select-sub">{{ selectedAddress.fullAddress }}</view>
         </view>
-      </picker>
+        <view v-else class="placeholder">请选择上门地址</view>
+      </view>
       <view v-else class="select-box address-empty" @click="goAddress">
         <view>
           <view class="select-title">暂无上门地址</view>
@@ -74,15 +74,24 @@
     <view class="card">
       <view class="card-title">菜品需求</view>
       <view v-if="dishes.length" class="dish-list">
-        <checkbox-group @change="changeDishes">
-          <label v-for="dish in dishes" :key="dish.id" class="dish-item">
-            <checkbox :value="String(dish.id)" :checked="selectedDishIds.indexOf(String(dish.id)) !== -1" color="#f06a3a" />
-            <view>
-              <view class="dish-name">{{ dish.name }}</view>
-              <view class="dish-meta">{{ dish.category }} {{ dish.cuisine }}</view>
-            </view>
-          </label>
-        </checkbox-group>
+        <view
+          v-for="dish in dishes"
+          :key="dish.id"
+          class="dish-item"
+          :class="{ 'is-selected': isDishSelected(dish.id) }"
+          @tap="toggleDishSelection(dish)"
+        >
+          <checkbox
+            :value="String(dish.id)"
+            :checked="isDishSelected(dish.id)"
+            color="#f06a3a"
+            @tap.stop="toggleDishSelection(dish)"
+          />
+          <view>
+            <view class="dish-name">{{ dish.name }}</view>
+            <view class="dish-meta">{{ dish.category }} {{ dish.cuisine }}</view>
+          </view>
+        </view>
       </view>
       <view v-else class="empty">暂无菜品库，可填写自定义菜名。</view>
 
@@ -96,6 +105,16 @@
         {{ submitting ? '提交中...' : '提交预约' }}
       </button>
     </view>
+
+    <uni-popup ref="availableTimePopup" type="dialog">
+      <view class="time-dialog">
+        <view class="time-dialog__title">可预约时间</view>
+        <view class="time-dialog__content">
+          <view v-for="item in availableTimeLines" :key="item" class="time-dialog__line">{{ item }}</view>
+        </view>
+        <button class="time-dialog__btn" @click="closeAvailableTimePopup">知道了</button>
+      </view>
+    </uni-popup>
   </view>
 </template>
 
@@ -138,8 +157,8 @@
       selectedAddress() {
         return this.selectedAddressIndex >= 0 ? this.addresses[this.selectedAddressIndex] : null
       },
-      addressOptions() {
-        return this.addresses.map(item => item.fullAddress)
+      availableTimeLines() {
+        return this.formatAvailableTimeLines(this.chef.availableTimeText)
       }
     },
     onLoad(option) {
@@ -208,7 +227,7 @@
           cuisines,
           serviceAreaText: areas.length ? areas.join('、') : '服务区域待完善',
           recommended: item.recommended || item.recommendFlag || item.isRecommended,
-          description: item.description || item.introduction || item.profile || item.remark || '',
+          description: item.intro || item.description || item.introduction || item.profile || item.remark || '',
           availableTimeText: this.formatAvailableTime(item),
           priceEstimateText: this.formatPriceEstimate(item)
         }
@@ -233,6 +252,14 @@
         const end = this.firstValue(item, ['serviceEndTime', 'workEndTime', 'availableEndTime', 'endTime'])
         if (start && end) return `${start}-${end}`
         return '可预约时间待确认'
+      },
+      formatAvailableTimeLines(text) {
+        const value = String(text || '可预约时间待确认').trim()
+        return value
+          .split(/[;；\n]+/)
+          .map(item => item.trim())
+          .filter(Boolean)
+          .map(item => /^\d/.test(item) ? item : item.replace(/^([^:：]+)[:：]\s*/, '$1 '))
       },
       formatPriceEstimate(item) {
         const directText = this.firstValue(item, ['priceText', 'priceEstimate', 'priceDescription', 'feeDescription'])
@@ -307,12 +334,15 @@
         if (Array.isArray(value)) return value.filter(Boolean)
         return String(value).split(/[、,，\s]+/).filter(Boolean)
       },
-      selectAddress(e) {
-        if (!this.addresses.length) {
-          this.goAddress()
-          return
+      openAvailableTimePopup() {
+        if (this.$refs.availableTimePopup) {
+          this.$refs.availableTimePopup.open()
         }
-        this.selectedAddressIndex = Number(e.detail.value)
+      },
+      closeAvailableTimePopup() {
+        if (this.$refs.availableTimePopup) {
+          this.$refs.availableTimePopup.close()
+        }
       },
       changeDate(e) {
         this.form.date = e.detail.value
@@ -320,8 +350,19 @@
       changeTime(e) {
         this.form.time = e.detail.value
       },
-      changeDishes(e) {
-        this.selectedDishIds = e.detail.value || []
+      isDishSelected(id) {
+        return this.selectedDishIds.indexOf(String(id)) !== -1
+      },
+      toggleDishSelection(dish) {
+        const id = String(dish.id)
+        const selectedDishIds = this.selectedDishIds.slice()
+        const index = selectedDishIds.indexOf(id)
+        if (index === -1) {
+          selectedDishIds.push(id)
+        } else {
+          selectedDishIds.splice(index, 1)
+        }
+        this.selectedDishIds = selectedDishIds
       },
       buildDishSnapshot(selectedDishes) {
         const customDishNames = String(this.form.customDish || '')
@@ -547,10 +588,20 @@
     padding-top: 20rpx;
   }
 
+  .info-row--link {
+    align-items: center;
+  }
+
   .info-label {
     flex-shrink: 0;
     color: #4e5a55;
     font-size: 26rpx;
+  }
+
+  .info-action {
+    display: flex;
+    align-items: center;
+    gap: 6rpx;
   }
 
   .info-value {
@@ -561,6 +612,11 @@
     line-height: 1.5;
     text-align: right;
     word-break: break-all;
+  }
+
+  .info-value--action {
+    flex: none;
+    color: #f06a3a;
   }
 
   .text-btn {
@@ -627,7 +683,13 @@
     align-items: center;
     gap: 16rpx;
     min-height: 76rpx;
+    padding: 8rpx 10rpx;
+    border-radius: 8rpx;
     border-bottom: 1rpx solid #f0f2ef;
+  }
+
+  .dish-item.is-selected {
+    background: #fff7f0;
   }
 
   .textarea {
@@ -664,5 +726,45 @@
 
   .submit-btn.is-disabled {
     background: #f4a484;
+  }
+
+  .time-dialog {
+    width: 620rpx;
+    box-sizing: border-box;
+    padding: 34rpx 30rpx 28rpx;
+    border-radius: 8rpx;
+    background: #fff;
+  }
+
+  .time-dialog__title {
+    color: #1d2b26;
+    font-size: 32rpx;
+    font-weight: 700;
+    text-align: center;
+  }
+
+  .time-dialog__content {
+    margin-top: 24rpx;
+    padding: 22rpx;
+    border-radius: 8rpx;
+    color: #26322d;
+    background: #fbfcfa;
+    font-size: 28rpx;
+    line-height: 1.6;
+    word-break: break-all;
+  }
+
+  .time-dialog__line + .time-dialog__line {
+    margin-top: 12rpx;
+  }
+
+  .time-dialog__btn {
+    height: 76rpx;
+    line-height: 76rpx;
+    margin-top: 28rpx;
+    border-radius: 8rpx;
+    color: #fff;
+    background: #f06a3a;
+    font-size: 28rpx;
   }
 </style>

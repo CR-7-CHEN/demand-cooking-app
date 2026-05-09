@@ -137,6 +137,14 @@ export function quoteChefOrder(data) {
   })
 }
 
+export function startServiceChefOrder(data) {
+  return request({
+    url: '/cooking/order/chef/serviceStart',
+    method: 'post',
+    data
+  })
+}
+
 export function serviceCompleteChefOrder(data) {
   return request({
     url: '/cooking/order/chef/serviceComplete',

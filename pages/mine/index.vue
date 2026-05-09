@@ -167,15 +167,7 @@
       },
       resolveChefAction(chef) {
         if (chefStatus.isChefWorkbenchAvailable(chef)) return null
-        if (chefStatus.needChefApply(chef)) {
-          return {
-            title: '申请入驻',
-            description: '平台审核通过即可接单',
-            buttonText: '申请入驻',
-            dialogTitle: '申请入驻',
-            dialogContent: '需要填写头像、服务区域、健康证、作品图和可预约时间，确认后将进入入驻资料页。'
-          }
-        }
+        if (chefStatus.needChefApply(chef)) return null
         if (chefStatus.isChefPending(chef)) {
           return {
             title: '申请审核中',
@@ -203,13 +195,7 @@
             dialogContent: '可查看当前入驻资料和状态说明，确认后前往资料页。'
           }
         }
-        return {
-          title: '申请入驻',
-          description: '平台审核通过即可接单',
-          buttonText: '申请入驻',
-          dialogTitle: '申请入驻',
-          dialogContent: '需要填写头像、服务区域、健康证、作品图和可预约时间，确认后将进入入驻资料页。'
-        }
+        return null
       },
       handleBuilding() {
         this.$modal.showToast('模块建设中~')

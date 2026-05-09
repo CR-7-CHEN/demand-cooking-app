@@ -6,16 +6,6 @@
           <view class="title">把一餐家常饭交给可靠的人</view>
         </view>
       </view>
-      <view v-if="!isCurrentChef" class="quick-actions hero-actions">
-        <view class="quick-item" @click="goAddress">
-          <uni-icons type="location-filled" size="24" color="#f06a3a"></uni-icons>
-          <text>地址管理</text>
-        </view>
-        <view class="quick-item" @click="goOrders">
-          <uni-icons type="calendar-filled" size="24" color="#20a779"></uni-icons>
-          <text>我的订单</text>
-        </view>
-      </view>
       <view v-if="showChefRecommendations" class="search-panel">
         <view class="search-row">
           <uni-icons type="search" size="18" color="#f06a3a"></uni-icons>
@@ -99,7 +89,13 @@
         </view>
         <view v-if="limitedAlerts.length === 0" class="empty-alert">暂无工作提醒</view>
         <view v-else class="alert-list">
-          <view v-for="item in limitedAlerts" :key="item.key || item.title" class="alert-item" :class="item._toneClass">
+          <view
+            v-for="item in limitedAlerts"
+            :key="item.key || item.title"
+            class="alert-item"
+            :class="[item._toneClass, { clickable: !!item.actionUrl }]"
+            @click="openAlert(item)"
+          >
             <view class="alert-main">
               <view class="alert-title">{{ item.title }}</view>
               <view class="alert-content">{{ item.content }}</view>
@@ -166,7 +162,7 @@
 <script>
   import { getToken } from '@/utils/auth'
   import { listChefs } from '@/api/cooking/user'
-  import { getChefMy, getChefWorkbench, pauseChef, resumeChef } from '@/api/cooking/chef'
+  import { getChefMy, getChefWorkbench, getChefTime, pauseChef, resumeChef } from '@/api/cooking/chef'
   import regionData from '@/utils/region-data'
   const chefStatus = require('@/utils/chef-status')
 
@@ -194,6 +190,7 @@
         regionPickerOpen: false,
         chefProfile: {},
         chefWorkbench: {},
+        expiredTimeCount: 0,
         statusSwitching: false,
         chefs: []
       }
@@ -234,7 +231,7 @@
       },
       limitedAlerts() {
         const alerts = Array.isArray(this.chefWorkbench.alerts) ? this.chefWorkbench.alerts : []
-        return alerts.slice(0, 3).map(item => {
+        return [this.buildExpiredTimeAlert(), ...alerts].filter(Boolean).slice(0, 3).map(item => {
           const tone = String(item.tone || '').toLowerCase()
           let cls = 'warning'
           if (tone === 'danger' || tone === 'error') cls = 'danger'
@@ -265,18 +262,28 @@
     methods: {
       loadPage() {
         return this.loadCurrentChef().finally(() => {
+          this.syncWorkTabBarLabel()
           if (this.isCurrentChef) {
             this.chefs = []
-            return this.loadChefWorkbench()
+            return Promise.all([this.loadChefWorkbench(), this.loadExpiredTimeCount()])
           }
           this.chefWorkbench = {}
+          this.expiredTimeCount = 0
           return this.loadChefs()
+        })
+      },
+      syncWorkTabBarLabel() {
+        if (typeof uni.setTabBarItem !== 'function') return
+        uni.setTabBarItem({
+          index: 1,
+          text: this.isCurrentChef ? '工作台' : '服务中心'
         })
       },
       loadCurrentChef() {
         if (!getToken()) {
           this.chefProfile = {}
           this.chefWorkbench = {}
+          this.expiredTimeCount = 0
           return Promise.resolve()
         }
         return getChefMy().then(res => {
@@ -284,6 +291,7 @@
         }).catch(() => {
           this.chefProfile = {}
           this.chefWorkbench = {}
+          this.expiredTimeCount = 0
         })
       },
       loadChefWorkbench() {
@@ -295,6 +303,17 @@
           this.chefWorkbench = this.unwrap(res) || {}
         }).catch(() => {
           this.chefWorkbench = {}
+        })
+      },
+      loadExpiredTimeCount() {
+        if (!this.isCurrentChef) {
+          this.expiredTimeCount = 0
+          return Promise.resolve()
+        }
+        return getChefTime({}).then(res => {
+          this.expiredTimeCount = this.countExpiredChefTimes(this.pickList(res))
+        }).catch(() => {
+          this.expiredTimeCount = 0
         })
       },
       loadChefs() {
@@ -488,6 +507,26 @@
         if (!Number.isFinite(count)) return 0
         return count
       },
+      countExpiredChefTimes(list) {
+        return (Array.isArray(list) ? list : []).filter(item => this.isExpiredChefTime(item)).length
+      },
+      isExpiredChefTime(item) {
+        const endTime = item && item.endTime
+        if (!endTime) return false
+        const end = new Date(String(endTime).replace(/-/g, '/')).getTime()
+        return Number.isFinite(end) && end > 0 && end < Date.now()
+      },
+      buildExpiredTimeAlert() {
+        if (!this.expiredTimeCount) return null
+        return {
+          key: 'expired-times',
+          title: '预约时间待清理',
+          content: `你有 ${this.expiredTimeCount} 个已过期预约时间段待清理`,
+          count: this.expiredTimeCount,
+          tone: 'danger',
+          actionUrl: '/pages/work/profile-time?mode=manage&focus=expired'
+        }
+      },
       alertToneClass(tone) {
         const value = String(tone || '').toLowerCase()
         if (value === 'danger' || value === 'error') return 'danger'
@@ -498,6 +537,11 @@
         if (item && item.action === 'commission') {
           this.goCommission()
         }
+      },
+      openAlert(item) {
+        const url = item && item.actionUrl
+        if (!url) return
+        this.requireLogin(url)
       },
       goCommission() {
         if (!this.isCurrentChef) return
@@ -866,6 +910,10 @@
     border-radius: 8rpx;
     background: #fff8e8;
     border-left: 6rpx solid #f0a83a;
+  }
+
+  .alert-item.clickable {
+    cursor: pointer;
   }
 
   .alert-item.danger {

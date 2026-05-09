@@ -63,13 +63,28 @@
     </view>
 
     <view v-if="canComplete || canChefCancel" class="action-card">
-      <view class="section-title">待服务处理</view>
-      <button v-if="canComplete" class="primary-btn" :loading="submitting" @click="submitComplete">确认服务完成</button>
-      <view v-if="canChefCancel" class="cancel-block">
-        <textarea class="textarea" v-model.trim="cancelReason" placeholder="做饭人员原因取消必须填写原因" />
-        <button class="plain-danger" :loading="submitting" @click="submitCancel">做饭人员原因取消</button>
-      </view>
+      <view class="section-title section-title--center">待服务处理</view>
+      <button v-if="canComplete" class="primary-btn" :loading="submitting" @click="submitServiceAction">{{ serviceActionText }}</button>
+      <button v-if="canChefCancel" class="danger-btn cancel-block__button" :loading="submitting" @click="openRejectServicePopup">拒绝服务</button>
     </view>
+
+    <uni-popup ref="rejectServicePopup" type="dialog" :is-mask-click="!submitting" @change="onRejectServicePopupChange">
+      <view class="reject-service-dialog">
+        <view class="reject-service-dialog__title">拒绝服务</view>
+        <view class="reject-service-dialog__desc">确定拒绝服务吗?</view>
+        <textarea
+          v-model.trim="rejectServiceReasonInput"
+          class="reject-service-dialog__input"
+          placeholder="请填写拒绝原因"
+          placeholder-class="reject-service-dialog__placeholder"
+          maxlength="500"
+        />
+        <view class="reject-service-dialog__actions">
+          <button class="reject-service-dialog__btn reject-service-dialog__btn--ghost" :disabled="submitting" @click="closeRejectServicePopup">取消</button>
+          <button class="reject-service-dialog__btn reject-service-dialog__btn--danger" :loading="submitting" @click="submitRejectService">确定</button>
+        </view>
+      </view>
+    </uni-popup>
   </view>
 </template>
 
@@ -78,6 +93,7 @@
     getCookingOrder,
     rejectChefOrder,
     quoteChefOrder,
+    startServiceChefOrder,
     serviceCompleteChefOrder,
     cancelChefOrder
   } from '@/api/cooking/chef'
@@ -101,7 +117,7 @@
         order: {},
         submitting: false,
         rejectReason: '',
-        cancelReason: '',
+        rejectServiceReasonInput: '',
         quoteForm: {
           serviceTotalPrice: '',
           quoteRemark: ''
@@ -120,7 +136,7 @@
           response: '待接单报价',
           dispute: '报价异议',
           service: '待服务',
-          confirm: '待确认',
+          confirm: '用户待确认',
           done: '已完成',
           other: '处理中'
         }
@@ -144,8 +160,14 @@
       canComplete() {
         return this.group === 'service'
       },
+      hasServiceStarted() {
+        return !!this.getServiceStartedTime(this.order) || this.order.serviceStarted === true || this.order.serviceStarted === 1 || this.order.serviceStarted === '1'
+      },
+      serviceActionText() {
+        return this.hasServiceStarted ? '服务完成' : '开始服务'
+      },
       canChefCancel() {
-        return this.group === 'service'
+        return this.group === 'service' && !this.hasServiceStarted
       }
     },
     onLoad(options) {
@@ -168,6 +190,10 @@
       },
       getTime(order) {
         return order.serviceStartTime || order.appointmentTime || order.bookingTime || order.startTime || order.reserveTime || ''
+      },
+      getServiceStartedTime(order) {
+        if (!order) return ''
+        return order.serviceStartedTime || order.serviceStartedAt || ''
       },
       getAddress(order) {
         const address = order.address || order.addressSnapshot || {}
@@ -221,30 +247,80 @@
           })
         })
       },
-      submitComplete() {
-        this.$modal.confirm('确认服务已完成？提交后订单将进入待用户确认。').then(() => {
-          this.submitting = true
-          serviceCompleteChefOrder(this.orderPayload()).then(() => {
-            this.$modal.msgSuccess('已提交服务完成')
-            this.load()
-          }).finally(() => {
-            this.submitting = false
-          })
-        })
-      },
-      submitCancel() {
-        if (!this.cancelReason) {
-          this.$modal.showToast('请填写取消原因')
+      submitServiceAction() {
+        if (this.hasServiceStarted) {
+          this.submitComplete()
           return
         }
-        this.$modal.confirm('确认因做饭人员原因取消？该操作会触发退款并计入违约次数。').then(() => {
-          this.submitting = true
-          cancelChefOrder(this.orderPayload({ reason: this.cancelReason, cancelReason: this.cancelReason })).then(() => {
-            this.$modal.msgSuccess('取消申请已提交')
-            this.load()
-          }).finally(() => {
-            this.submitting = false
-          })
+        this.submitStartService()
+      },
+      submitStartService() {
+        uni.showModal({
+          content: '确认开始服务吗?',
+          cancelText: '取消',
+          confirmText: '确认',
+          success: res => {
+            if (!res.confirm) return
+            this.submitting = true
+            startServiceChefOrder(this.orderPayload()).then(() => {
+              this.$modal.msgSuccess('已开始服务')
+              this.load()
+            }).finally(() => {
+              this.submitting = false
+            })
+          }
+        })
+      },
+      submitComplete() {
+        if (!this.hasServiceStarted) {
+          this.$modal.showToast('请先开始服务')
+          return
+        }
+        uni.showModal({
+          content: '服务确认完成了吗?',
+          cancelText: '取消',
+          confirmText: '确认完成',
+          success: res => {
+            if (!res.confirm) return
+            this.submitting = true
+            serviceCompleteChefOrder(this.orderPayload()).then(() => {
+              this.$modal.msgSuccess('已提交服务完成')
+              this.load()
+            }).finally(() => {
+              this.submitting = false
+            })
+          }
+        })
+      },
+      openRejectServicePopup() {
+        if (this.submitting || !this.$refs.rejectServicePopup) return
+        this.$refs.rejectServicePopup.open()
+      },
+      onRejectServicePopupChange(event) {
+        if (event && event.show) return
+        this.rejectServiceReasonInput = ''
+      },
+      closeRejectServicePopup() {
+        if (this.submitting || !this.$refs.rejectServicePopup) return
+        this.$refs.rejectServicePopup.close()
+      },
+      submitRejectService() {
+        if (!this.rejectServiceReasonInput) {
+          this.$modal.showToast('请填写拒绝原因')
+          return
+        }
+        this.submitting = true
+        cancelChefOrder(this.orderPayload({
+          reason: this.rejectServiceReasonInput,
+          cancelReason: this.rejectServiceReasonInput
+        })).then(() => {
+          this.$modal.msgSuccess('拒绝服务已提交')
+          if (this.$refs.rejectServicePopup) {
+            this.$refs.rejectServicePopup.close()
+          }
+          this.load()
+        }).finally(() => {
+          this.submitting = false
         })
       }
     }
@@ -363,6 +439,10 @@
     font-weight: 700;
   }
 
+  .section-title--center {
+    text-align: center;
+  }
+
   .field {
     margin-bottom: 20rpx;
   }
@@ -394,7 +474,8 @@
   }
 
   .primary-btn,
-  .plain-danger {
+  .plain-danger,
+  .danger-btn {
     height: 80rpx;
     line-height: 80rpx;
     border-radius: 8rpx;
@@ -412,9 +493,86 @@
     color: #a82819;
   }
 
+  .danger-btn {
+    margin-top: 18rpx;
+    background: #c64034;
+    color: #fff;
+  }
+
   .cancel-block {
     margin-top: 22rpx;
     padding-top: 22rpx;
     border-top: 1rpx solid #edf0ee;
+  }
+
+  .cancel-block__button {
+    width: 100%;
+  }
+
+  .reject-service-dialog {
+    width: 620rpx;
+    padding: 36rpx 32rpx 28rpx;
+    border-radius: 16rpx;
+    background: #fff;
+    box-sizing: border-box;
+  }
+
+  .reject-service-dialog__title {
+    color: #17211b;
+    font-size: 36rpx;
+    font-weight: 700;
+    text-align: center;
+  }
+
+  .reject-service-dialog__desc {
+    margin-top: 18rpx;
+    color: #66756b;
+    font-size: 28rpx;
+    line-height: 1.6;
+    text-align: center;
+  }
+
+  .reject-service-dialog__input {
+    width: 100%;
+    min-height: 180rpx;
+    margin-top: 22rpx;
+    padding: 18rpx 20rpx;
+    border: 1rpx solid #e2e8e4;
+    border-radius: 8rpx;
+    box-sizing: border-box;
+    color: #17211b;
+    font-size: 24rpx;
+    line-height: 1.6;
+    background: #fbfcfb;
+  }
+
+  .reject-service-dialog__placeholder {
+    color: #98a29b;
+    font-size: 22rpx;
+  }
+
+  .reject-service-dialog__actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18rpx;
+    margin-top: 26rpx;
+  }
+
+  .reject-service-dialog__btn {
+    height: 76rpx;
+    line-height: 76rpx;
+    border-radius: 8rpx;
+    font-size: 28rpx;
+  }
+
+  .reject-service-dialog__btn--ghost {
+    background: #fff;
+    color: #5f6d64;
+    border: 1rpx solid #d7dfda;
+  }
+
+  .reject-service-dialog__btn--danger {
+    background: #a82819;
+    color: #fff;
   }
 </style>

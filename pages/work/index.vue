@@ -1,11 +1,11 @@
 <template>
-  <view v-if="!redirectingToMine" class="chef-work-page">
-    <view class="top-card">
+  <view class="chef-work-page">
+    <view class="top-card" :class="{ 'service-top-card': !isChefWorkbenchAvailable }">
       <view class="top-row">
         <view>
           <view class="title-row">
-            <text class="chef-name">{{ chefName }}</text>
-            <text v-if="!needApply" :class="['status-pill', statusTone]">{{ auditStatusText }}</text>
+            <text class="chef-name">{{ pageTitle }}</text>
+            <text v-if="isChefWorkbenchAvailable && !needApply" :class="['status-pill', statusTone]">{{ auditStatusText }}</text>
           </view>
         </view>
         <image class="avatar" :src="chefAvatar" mode="aspectFill"></image>
@@ -30,6 +30,28 @@
         <view v-else class="notice-empty">暂无公告</view>
       </view>
 
+    </view>
+
+    <view v-if="!isChefWorkbenchAvailable" class="service-section">
+      <view class="service-head">
+        <text class="service-title">服务中心</text>
+        <text class="service-desc">查看订单、地址、客服与常见问题</text>
+      </view>
+      <view class="quick-list service-list">
+        <view
+          v-for="item in serviceCenterActions"
+          :key="item.title"
+          class="quick-item"
+          @click="handleServiceCenterAction(item)"
+        >
+          <view class="quick-icon" :class="item.tone">{{ item.badge }}</view>
+          <view class="quick-body">
+            <text class="quick-title">{{ item.title }}</text>
+            <text class="quick-desc">{{ item.description }}</text>
+          </view>
+          <text class="arrow">></text>
+        </view>
+      </view>
     </view>
 
     <view v-if="isChefWorkbenchAvailable" class="summary-grid">
@@ -105,6 +127,7 @@
 </template>
 
 <script>
+  import { getToken } from '@/utils/auth'
   import {
     getChefMy,
     resignChef,
@@ -132,12 +155,14 @@
         chef: {},
         orders: [],
         announcements: [],
-        redirectingToMine: false,
         resignReasonInput: '',
         resignSubmitting: false
       }
     },
     computed: {
+      pageTitle() {
+        return this.isChefWorkbenchAvailable ? this.chefName : '服务中心'
+      },
       chefName() {
         return this.chef.realName || this.chef.name || this.chef.nickName || this.$store.state.user.name || '做饭人员'
       },
@@ -170,6 +195,49 @@
       },
       canResign() {
         return this.isChefWorkbenchAvailable
+      },
+      serviceCenterActions() {
+        return [
+          {
+            title: '我的订单',
+            description: '查看当前账号的订单记录与服务进度',
+            url: '/pages/user/orders',
+            badge: '订',
+            tone: 'orange',
+            requiresLogin: true
+          },
+          {
+            title: '地址管理/常用地址',
+            description: '维护常用地址，方便下单时快速选择',
+            url: '/pages/user/address',
+            badge: '址',
+            tone: 'dark',
+            requiresLogin: true
+          },
+          {
+            title: '在线客服',
+            description: '前往客服入口，咨询平台规则与问题',
+            url: '/pages/mine/service/index',
+            badge: '服',
+            tone: 'blue'
+          },
+          {
+            title: '常见问题',
+            description: '查看常见问题与使用说明',
+            url: '/pages/mine/help/index',
+            badge: '问',
+            tone: 'green'
+          },
+          {
+            title: '申请成为做饭人员',
+            description: '提交做饭人员资料，申请开通工作台能力',
+            url: '/pages/work/profile',
+            badge: '申',
+            tone: 'red',
+            action: 'applyChef',
+            requiresLogin: true
+          }
+        ]
       },
       announcementText() {
         return this.announcements.filter(Boolean).join('   |   ')
@@ -206,18 +274,30 @@
     },
     methods: {
       loadPage() {
-        this.redirectingToMine = false
         this.loading = true
         return this.loadChef().then(() => {
+          this.syncPageLabels()
           if (this.isChefWorkbenchAvailable) {
             return Promise.all([this.loadOrders(), this.loadAnnouncements()])
           }
           this.orders = []
           this.announcements = []
-          return this.redirectNonWorkbenchUser()
+          return Promise.resolve()
         }).finally(() => {
           this.loading = false
         })
+      },
+      syncPageLabels() {
+        const title = this.isChefWorkbenchAvailable ? '工作台' : '服务中心'
+        if (typeof uni.setTabBarItem === 'function') {
+          uni.setTabBarItem({
+            index: 1,
+            text: title
+          })
+        }
+        if (typeof uni.setNavigationBarTitle === 'function') {
+          uni.setNavigationBarTitle({ title })
+        }
       },
       loadChef() {
         return getChefMy().then(res => {
@@ -245,24 +325,6 @@
         }).catch(() => {
           this.announcements = []
         })
-      },
-      redirectNonWorkbenchUser() {
-        if (this.redirectingToMine) return Promise.resolve()
-        this.redirectingToMine = true
-        uni.showToast({
-          title: '请前往“我的”申请或查看资料',
-          icon: 'none'
-        })
-        if (this.$tab && typeof this.$tab.switchTab === 'function') {
-          this.$tab.switchTab('/pages/mine/index')
-          return Promise.resolve()
-        }
-        if (typeof uni.switchTab === 'function') {
-          return Promise.resolve(uni.switchTab({
-            url: '/pages/mine/index'
-          }))
-        }
-        return Promise.resolve()
       },
       formatAnnouncement(item) {
         if (typeof item === 'string') return item
@@ -316,6 +378,36 @@
         if (!date || isNaN(date.getTime())) return ''
         const month = date.getMonth() + 1
         return `${date.getFullYear()}-${month < 10 ? '0' + month : month}`
+      },
+      handleServiceCenterAction(item) {
+        if (!item || !item.url) return
+        if (item.action === 'applyChef') {
+          uni.showModal({
+            title: '申请入驻',
+            content: '是否申请入驻成为做饭人员?',
+            cancelText: '否',
+            confirmText: '是',
+            success: (res) => {
+              if (res.confirm) {
+                this.requireLogin(item.url)
+              }
+            }
+          })
+          return
+        }
+        if (item.requiresLogin) {
+          this.requireLogin(item.url)
+          return
+        }
+        this.$tab.navigateTo(item.url)
+      },
+      requireLogin(nextUrl) {
+        if (!getToken()) {
+          this.$modal.msg('请先登录后继续')
+          this.$tab.navigateTo('/pages/login')
+          return
+        }
+        this.$tab.navigateTo(nextUrl)
       },
       goProfile() {
         if (this.needApply) {
@@ -393,6 +485,10 @@
     border-radius: 16rpx;
     background: #6a3a2b;
     color: #fff;
+  }
+
+  .service-top-card {
+    background: linear-gradient(135deg, #f05d3c 0%, #f58a4b 58%, #ffc46b 100%);
   }
 
   .top-row,
@@ -543,6 +639,27 @@
     margin-top: 22rpx;
   }
 
+  .service-section {
+    margin-top: 24rpx;
+  }
+
+  .service-head {
+    margin-bottom: 16rpx;
+  }
+
+  .service-title {
+    display: block;
+    font-size: 30rpx;
+    font-weight: 700;
+  }
+
+  .service-desc {
+    display: block;
+    margin-top: 8rpx;
+    color: #607066;
+    font-size: 24rpx;
+  }
+
   .summary-card {
     padding: 26rpx;
   }
@@ -612,6 +729,10 @@
 
   .quick-icon.blue {
     background: #316a93;
+  }
+
+  .quick-icon.red {
+    background: #b9432d;
   }
 
   .quick-body {

@@ -73,7 +73,7 @@
           label: '待服务',
           value: 'service'
         }, {
-          label: '待确认',
+          label: '用户待确认',
           value: 'confirm'
         }, {
           label: '已完成',
@@ -128,7 +128,7 @@
           response: '待接单报价',
           dispute: '报价异议',
           service: '待服务',
-          confirm: '待确认',
+          confirm: '用户待确认',
           done: '已完成'
         }
         return order.statusName || order.orderStatusName || map[this.tabOf(order)] || '处理中'

@@ -39,7 +39,7 @@
   }, {
     "path": "pages/work/index",
     "style": {
-      "navigationBarTitleText": "工作台"
+      "navigationBarTitleText": "服务中心"
     }
   }, {
     "path": "pages/work/profile",
@@ -146,7 +146,7 @@
         "pagePath": "pages/work/index",
         "iconPath": "static/images/tabbar/work.png",
         "selectedIconPath": "static/images/tabbar/work_.png",
-        "text": "工作台"
+        "text": "服务中心"
       }, {
         "pagePath": "pages/mine/index",
         "iconPath": "static/images/tabbar/mine.png",
