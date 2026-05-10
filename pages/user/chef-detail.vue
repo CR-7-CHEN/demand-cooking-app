@@ -11,7 +11,7 @@
         <view class="tags">
           <text v-for="item in chef.cuisines" :key="item" class="tag">{{ item }}</text>
         </view>
-        <view class="area">服务区域：{{ chef.serviceAreaText }}</view>
+        <view class="area">{{ chef.serviceAreaText }}</view>
       </view>
     </view>
 
@@ -225,7 +225,7 @@
           rating: this.pickChefRating(item),
           completedCount: item.completedCount || item.completeCount || item.orderCount || item.finishedOrderCount || 0,
           cuisines,
-          serviceAreaText: areas.length ? areas.join('、') : '服务区域待完善',
+          serviceAreaText: areas.length ? areas.join('、') : '',
           recommended: item.recommended || item.recommendFlag || item.isRecommended,
           description: item.intro || item.description || item.introduction || item.profile || item.remark || '',
           availableTimeText: this.formatAvailableTime(item),

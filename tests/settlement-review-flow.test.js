@@ -21,6 +21,10 @@ function loadComponentOptions(apiOverrides = {}, uniOverrides = {}) {
         'const confirmChefSettlement = globalThis.__testApi.confirmChefSettlement'
       ].join('\n') + '\n'
     )
+    .replace(
+      /const orderStatus = require\('@\/utils\/order-status'\)/,
+      `const orderStatus = require(${JSON.stringify(path.join(__dirname, '..', 'utils', 'order-status.js'))})`
+    )
     .replace(/export default/, 'module.exports =')
 
   const sandbox = {

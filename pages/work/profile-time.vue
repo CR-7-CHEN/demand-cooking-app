@@ -19,8 +19,8 @@
             <text v-if="item.remark" class="time-remark">{{ item.remark }}</text>
           </view>
           <view class="time-actions">
-            <text v-if="!isManageMode" class="text-action" @click="editTime(item)">编辑</text>
-            <text v-if="!isManageMode || isExpiredTime(item)" class="text-action danger" @click="removeTime(item)">删除</text>
+            <view v-if="!isManageMode" class="text-action" @tap.stop="editTime(item)">编辑</view>
+            <view v-if="!isManageMode || isExpiredTime(item)" class="text-action danger" @tap.stop="removeTime(item)">删除</view>
           </view>
         </view>
       </view>
@@ -286,16 +286,26 @@
         this.resetTimeForm()
         return true
       },
-      removeTime(item) {
+      async removeTime(item) {
         if (this.isManageMode && !this.isExpiredTime(item)) return
-        this.$modal.confirm('确认删除该可预约时间段吗？').then(() => {
+        try {
+          await this.$modal.confirm('确认删除该可预约时间段吗？')
           if (this.isManageMode && item.timeId) {
-            return deleteChefTime(item.timeId).then(() => {
-              this.chefTimes = this.chefTimes.filter(time => time.localId !== item.localId)
-            })
+            this.chefTimes = this.chefTimes.filter(time => time.localId !== item.localId)
+            await deleteChefTime(item.timeId)
+            await this.loadManageTimes()
+            return
+          } else {
+            this.chefTimes = this.chefTimes.filter(time => time.localId !== item.localId)
           }
-          this.chefTimes = this.chefTimes.filter(time => time.localId !== item.localId)
-        })
+        } catch (error) {
+          if (this.isManageMode && item.timeId && Array.isArray(this.chefTimes) && !this.chefTimes.some(time => time.localId === item.localId)) {
+            await this.loadManageTimes().catch(() => {})
+          }
+          if (error && this.$modal && this.$modal.showToast) {
+            this.$modal.showToast('删除失败，请重试')
+          }
+        }
       },
       flushTimeFormBeforeConfirm() {
         if (!this.hasTimeFormInput()) return true
@@ -445,6 +455,11 @@
   }
 
   .text-action {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 52rpx;
+    padding: 0 8rpx;
     color: #2f8f55;
     font-size: 25rpx;
   }

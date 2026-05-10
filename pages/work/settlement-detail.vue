@@ -17,7 +17,7 @@
       <view v-if="hasSettlement" class="amount-card">
         <text class="amount-label">应发金额</text>
         <view class="amount">{{ money(payableAmount) }}</view>
-        <text class="amount-tip">包含底薪、提成和违约扣款，确认无异议后进入待发放。</text>
+        <text class="amount-tip">按底薪与每单提成汇总展示，违约扣款单独列示，确认无异议后进入待发放。</text>
       </view>
 
       <view v-if="hasSettlement" class="grid">
@@ -160,6 +160,7 @@
 
 <script>
   import { getChefSettlementDetail, getChefOrderList, submitChefSettlementReview, confirmChefSettlement } from '@/api/cooking/chef'
+  const orderStatus = require('@/utils/order-status')
 
   const SETTLED_STATUSES = ['FINISHED', 'COMPLETED', 'DONE']
   const STATUS_TEXT_MAP = {
@@ -242,7 +243,7 @@
         return REVIEW_RESULT_LABEL_MAP[result] || result || '待平台处理'
       },
       payableAmount() {
-        return this.value('payableAmount', 'salaryAmount', 'totalPayable', 'monthIncome', 'totalAmount')
+        return this.resolveDisplayPayableAmount(this.settlement)
       },
       completeCount() {
         return this.value('completeCount', 'completedOrderCount', 'finishedCount', 'completedCount', 'orderCount')
@@ -477,6 +478,28 @@
         }
         return 0
       },
+      resolveDisplayPayableAmount(item) {
+        const baseSalary = this.firstNumericValue(item, ['baseSalary', 'personalBaseSalary'])
+        const commissionAmount = this.firstNumericValue(item, ['orderCommission', 'chefCommission', 'commissionAmount', 'totalCommission'])
+        if (baseSalary !== null && commissionAmount !== null) {
+          return baseSalary + commissionAmount
+        }
+        const payableAmount = this.firstNumericValue(item, ['payableAmount', 'salaryAmount', 'totalPayable', 'monthIncome', 'totalAmount'])
+        return payableAmount === null ? 0 : payableAmount
+      },
+      firstNumericValue(item, keys) {
+        for (let i = 0; i < keys.length; i += 1) {
+          const value = item && item[keys[i]]
+          if (value === undefined || value === null || value === '') {
+            continue
+          }
+          const number = Number(value)
+          if (!Number.isNaN(number)) {
+            return number
+          }
+        }
+        return null
+      },
       isSettlementOrder(order) {
         const status = this.normalizeStatus(order.status || order.orderStatus)
         return SETTLED_STATUSES.indexOf(status) > -1
@@ -514,7 +537,9 @@
           dishes: this.getDishes(order),
           amount: order.payAmount || order.totalAmount || order.quoteAmount || order.orderAmount || 0,
           commission: order.chefCommission || order.orderCommission || order.commissionAmount || order.settlementAmount || 0,
-          statusText: order.statusName || order.orderStatusName || '已完成',
+          statusText: orderStatus.displayOrderStatusText(order.statusName || order.orderStatusName) ||
+            orderStatus.displayOrderStatusText(order.status || order.orderStatus) ||
+            '已完成',
           tone: this.isSettlementOrder(order) ? 'ok' : 'muted'
         }
       },

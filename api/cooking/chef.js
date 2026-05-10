@@ -101,7 +101,8 @@ export function deleteChefTime(id) {
   return request({
     url: '/cooking/chef/time',
     method: 'delete',
-    params: { id }
+    params: { id },
+    data: { timeId: id, id }
   })
 }
 

@@ -23,6 +23,10 @@ function loadComponentOptions() {
         'const confirmChefSettlement = globalThis.__testApi.confirmChefSettlement'
       ].join('\n') + '\n'
     )
+    .replace(
+      /const orderStatus = require\('@\/utils\/order-status'\)/,
+      `const orderStatus = require(${JSON.stringify(path.join(__dirname, '..', 'utils', 'order-status.js'))})`
+    )
     .replace(/export default/, 'module.exports =')
 
   const sandbox = {
@@ -60,7 +64,8 @@ function createPageContext(component, overrides = {}) {
     'canRequestReview',
     'isReviewingSettlement',
     'reviewReasonLabel',
-    'reviewRemarkText'
+    'reviewRemarkText',
+    'payableAmount'
   ]
 
   computedNames.forEach(name => {
@@ -183,4 +188,18 @@ test('settlement detail page normalizes compact settlement months', () => {
   const ctx = createPageContext(component)
 
   assert.equal(component.methods.formatMonth.call(ctx, '202604'), '2026-04')
+})
+
+test('settlement detail page displays payable amount as base salary plus gross commission', () => {
+  const component = loadComponentOptions()
+  const ctx = createPageContext(component, {
+    settlement: {
+      baseSalary: 3000,
+      chefCommission: 560,
+      payableAmount: 3360,
+      violationDeduction: 200
+    }
+  })
+
+  assert.equal(ctx.payableAmount, 3560)
 })

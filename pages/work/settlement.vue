@@ -51,7 +51,7 @@
             </view>
             <view class="metric">
               <text class="metric-label">应发金额</text>
-              <text class="metric-value money">{{ formatMoney(item.payableAmount) }}</text>
+              <text class="metric-value money">{{ formatMoney(item.displayPayableAmount) }}</text>
             </view>
           </view>
 
@@ -293,6 +293,7 @@
             'monthIncome',
             'totalAmount'
           ])),
+          displayPayableAmount: this.resolveDisplayPayableAmount(item),
           settlementStatus: this.statusText(item, statusKey),
           statusText: this.statusText(item, statusKey),
           statusTone: this.statusTone(statusKey),
@@ -312,6 +313,28 @@
       normalizeNumber(value) {
         const number = Number(value)
         return Number.isNaN(number) ? 0 : number
+      },
+      resolveDisplayPayableAmount(item) {
+        const baseSalary = this.firstNumericValue(item, ['baseSalary', 'personalBaseSalary'])
+        const commissionAmount = this.firstNumericValue(item, ['orderCommission', 'chefCommission', 'commissionAmount', 'totalCommission'])
+        if (baseSalary !== null && commissionAmount !== null) {
+          return baseSalary + commissionAmount
+        }
+        const payableAmount = this.firstNumericValue(item, ['payableAmount', 'salaryAmount', 'totalPayable', 'monthIncome', 'totalAmount'])
+        return payableAmount === null ? 0 : payableAmount
+      },
+      firstNumericValue(item, keys) {
+        for (let i = 0; i < keys.length; i += 1) {
+          const value = item && item[keys[i]]
+          if (value === undefined || value === null || value === '') {
+            continue
+          }
+          const number = Number(value)
+          if (!Number.isNaN(number)) {
+            return number
+          }
+        }
+        return null
       },
       normalizeStatus(status) {
         return String(status || '').trim().toUpperCase()

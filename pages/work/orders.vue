@@ -7,12 +7,15 @@
         :class="['tab', activeTab === tab.value ? 'active' : '']"
         @click="activeTab = tab.value"
       >
-        {{ tab.label }}
+        <view class="tab-content">
+          <text class="tab-text">{{ tab.label }}</text>
+          <text v-if="showTabCount(tab)" class="tab-badge">{{ formatTabCount(tabCountOf(tab.value)) }}</text>
+        </view>
       </view>
     </view>
 
     <view v-if="filteredOrders.length" class="order-list">
-      <view v-for="order in filteredOrders" :key="order.id || order.orderId" class="order-card" @click="goDetail(order)">
+      <view v-for="order in filteredOrders" :key="order.orderId" class="order-card" @click="goDetail(order)">
         <view class="card-top">
           <view>
             <view class="order-no">{{ order.orderNo || order.orderCode || ('订单 #' + (order.id || order.orderId)) }}</view>
@@ -44,7 +47,7 @@
 </template>
 
 <script>
-  import { getChefOrderList } from '@/api/cooking/chef'
+  import { getChefOrderList, getChefWorkbench } from '@/api/cooking/chef'
   const orderStatus = require('@/utils/order-status')
   const CHEF_ORDER_GROUP_MAP = {
     [orderStatus.ORDER_STATUS.WAITING_RESPONSE]: 'response',
@@ -53,9 +56,50 @@
     [orderStatus.ORDER_STATUS.WAITING_CONFIRM]: 'confirm',
     [orderStatus.ORDER_STATUS.COMPLETED]: 'done'
   }
+  const CHEF_STATUS_TEXT_MAP = {
+    [orderStatus.ORDER_STATUS.WAITING_RESPONSE]: '待接单报价',
+    [orderStatus.ORDER_STATUS.PRICE_OBJECTION]: '报价异议',
+    [orderStatus.ORDER_STATUS.WAITING_SERVICE]: '待服务',
+    [orderStatus.ORDER_STATUS.WAITING_CONFIRM]: '用户待确认',
+    [orderStatus.ORDER_STATUS.COMPLETED]: '已完成'
+  }
 
   function chefOrderStatusGroup(status) {
     return CHEF_ORDER_GROUP_MAP[orderStatus.normalizeOrderStatus(status)] || ''
+  }
+
+  const TAB_COUNT_FIELDS = Object.freeze({
+    response: ['waitingResponseCount', 'responseCount', 'response'],
+    service: ['waitingServiceCount', 'serviceCount', 'service'],
+    dispute: ['disputeCount', 'priceObjectionCount', 'dispute'],
+    refund: ['refundedCount', 'refundCount', 'refund']
+  })
+
+  function readCountValue(source, keys) {
+    if (!source || !Array.isArray(keys)) return null
+    for (let i = 0; i < keys.length; i += 1) {
+      const key = keys[i]
+      if (!Object.prototype.hasOwnProperty.call(source, key)) continue
+      const count = Number(source[key])
+      if (Number.isFinite(count) && count >= 0) {
+        return count
+      }
+    }
+    return null
+  }
+
+  function toOrderStats(workbench) {
+    const stats = workbench && typeof workbench === 'object'
+      ? (workbench.orderStats || workbench)
+      : null
+    if (!stats) return null
+    return {
+      total: readCountValue(stats, ['orderTotalCount', 'total']),
+      response: readCountValue(stats, TAB_COUNT_FIELDS.response),
+      service: readCountValue(stats, TAB_COUNT_FIELDS.service),
+      dispute: readCountValue(stats, TAB_COUNT_FIELDS.dispute),
+      refund: readCountValue(stats, TAB_COUNT_FIELDS.refund)
+    }
   }
 
   export default {
@@ -63,6 +107,7 @@
       return {
         activeTab: 'all',
         orders: [],
+        orderStats: null,
         tabs: [{
           label: '全部',
           value: 'all'
@@ -73,11 +118,14 @@
           label: '待服务',
           value: 'service'
         }, {
+          label: '已完成',
+          value: 'done'
+        }, {
           label: '用户待确认',
           value: 'confirm'
         }, {
-          label: '已完成',
-          value: 'done'
+          label: '已退款',
+          value: 'refund'
         }, {
           label: '异议',
           value: 'dispute'
@@ -100,10 +148,15 @@
     },
     methods: {
       load() {
-        return getChefOrderList({ pageNum: 1, pageSize: 100 }).then(res => {
-          this.orders = this.toList(res)
-        }).catch(() => {
-          this.orders = []
+        return Promise.allSettled([
+          getChefOrderList({ pageNum: 1, pageSize: 100 }),
+          getChefWorkbench()
+        ]).then(([orderResult, workbenchResult]) => {
+          this.orders = orderResult && orderResult.status === 'fulfilled' ? this.toList(orderResult.value) : []
+          const workbench = workbenchResult && workbenchResult.status === 'fulfilled'
+            ? (workbenchResult.value && workbenchResult.value.data !== undefined ? workbenchResult.value.data : workbenchResult.value)
+            : null
+          this.orderStats = toOrderStats(workbench)
         })
       },
       toList(res) {
@@ -121,17 +174,28 @@
         return order.orderStatus
       },
       tabOf(order) {
-        return chefOrderStatusGroup(this.orderStatusOf(order)) || 'all'
+        const status = this.orderStatusOf(order)
+        if (orderStatus.isRefundOrderStatus(status)) return 'refund'
+        return chefOrderStatusGroup(status) || 'all'
+      },
+      tabCountOf(tabValue) {
+        if (this.orderStats && this.orderStats[tabValue] !== null && this.orderStats[tabValue] !== undefined) {
+          return this.orderStats[tabValue]
+        }
+        return this.orders.filter(order => this.tabOf(order) === tabValue).length
+      },
+      showTabCount(tab) {
+        return !!tab && (tab.value === 'response' || tab.value === 'service' || tab.value === 'dispute')
+      },
+      formatTabCount(count) {
+        const value = Number(count)
+        if (!Number.isFinite(value) || value < 0) return '0'
+        return value > 99 ? '99+' : String(value)
       },
       statusText(order) {
-        const map = {
-          response: '待接单报价',
-          dispute: '报价异议',
-          service: '待服务',
-          confirm: '用户待确认',
-          done: '已完成'
-        }
-        return order.statusName || order.orderStatusName || map[this.tabOf(order)] || '处理中'
+        return orderStatus.displayOrderStatusText(order.statusName || order.orderStatusName, CHEF_STATUS_TEXT_MAP) ||
+          orderStatus.displayOrderStatusText(this.orderStatusOf(order), CHEF_STATUS_TEXT_MAP) ||
+          '处理中'
       },
       statusTone(order) {
         const tab = this.tabOf(order)
@@ -198,6 +262,30 @@
     background: #fff;
     color: #607066;
     font-size: 26rpx;
+  }
+
+  .tab-content {
+    display: flex;
+    align-items: center;
+    gap: 10rpx;
+  }
+
+  .tab-text {
+    white-space: nowrap;
+  }
+
+  .tab-badge {
+    min-width: 36rpx;
+    height: 36rpx;
+    padding: 0 10rpx;
+    box-sizing: border-box;
+    line-height: 36rpx;
+    border-radius: 999rpx;
+    background: #e85d34;
+    color: #fff;
+    font-size: 20rpx;
+    text-align: center;
+    font-weight: 600;
   }
 
   .tab.active {

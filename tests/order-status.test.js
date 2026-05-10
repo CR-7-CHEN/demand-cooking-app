@@ -3,9 +3,11 @@ const assert = require('node:assert/strict');
 
 const {
   ORDER_STATUS,
+  displayOrderStatusText,
   normalizeOrderStatus,
   orderStatusGroup,
   isOrderStatus,
+  isRefundOrderStatus,
   isCompletedOrder,
   statusesOfUserTab,
   tabOfUserStatus
@@ -53,6 +55,14 @@ test('matches status by normalized canonical key', () => {
   assert.equal(isOrderStatus('WAITING_PAY', ORDER_STATUS.WAITING_RESPONSE), false);
 });
 
+test('detects refund lifecycle statuses before chef pages map tabs locally', () => {
+  assert.equal(isRefundOrderStatus('REFUNDING'), true);
+  assert.equal(isRefundOrderStatus('REFUNDED'), true);
+  assert.equal(isRefundOrderStatus('REFUND_FAILED'), true);
+  assert.equal(isRefundOrderStatus('CANCELED'), false);
+  assert.equal(isRefundOrderStatus(ORDER_STATUS.COMPLETED), false);
+});
+
 test('maps closed and unknown statuses away from active or completed groups', () => {
   assert.equal(orderStatusGroup('REJECTED_CLOSED'), 'closed');
   assert.equal(orderStatusGroup('CANCELED'), 'closed');
@@ -70,4 +80,12 @@ test('exposes numeric user tab status groups from the shared status utility', ()
   assert.equal(tabOfUserStatus('WAITING_CONFIRM'), 'serving');
   assert.equal(tabOfUserStatus('COMPLETED'), 'completed');
   assert.equal(tabOfUserStatus('CANCELED'), '');
+});
+
+test('maps backend english status enums to readable Chinese copy', () => {
+  assert.equal(displayOrderStatusText('REFUNDED'), '已退款');
+  assert.equal(displayOrderStatusText('REFUNDING'), '退款中');
+  assert.equal(displayOrderStatusText('WAITING_CONFIRM'), '待确认');
+  assert.equal(displayOrderStatusText('COMPLETED'), '已完成');
+  assert.equal(displayOrderStatusText('已退款'), '已退款');
 });

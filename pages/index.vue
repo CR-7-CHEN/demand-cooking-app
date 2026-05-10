@@ -67,7 +67,10 @@
 
       <view class="dashboard-head">
         <text class="dashboard-title">收益概览</text>
-        <text class="dashboard-link" @click="goOrders">我的订单 ></text>
+        <view class="dashboard-link-wrap" @click="goOrders">
+          <text class="dashboard-link">我的订单 ></text>
+          <text v-if="orderReminderCount > 0" class="dashboard-badge">{{ orderReminderBadgeText }}</text>
+        </view>
       </view>
       <view class="revenue-grid">
         <view
@@ -79,7 +82,7 @@
         >
           <text class="revenue-label">{{ item.label }}</text>
           <text class="revenue-value">{{ item.value }}</text>
-          <text v-if="item.extra" class="revenue-extra">{{ item.extra }}</text>
+          <text v-if="item.extra" class="revenue-extra">{{ item.extra.replace(' · ', '\n') }}</text>
         </view>
       </view>
 
@@ -91,7 +94,7 @@
         <view v-else class="alert-list">
           <view
             v-for="item in limitedAlerts"
-            :key="item.key || item.title"
+            :key="item.key"
             class="alert-item"
             :class="[item._toneClass, { clickable: !!item.actionUrl }]"
             @click="openAlert(item)"
@@ -167,6 +170,40 @@
   const chefStatus = require('@/utils/chef-status')
 
   const defaultAvatar = '/static/images/profile.jpg'
+  function readWorkbenchCount(...values) {
+    for (let i = 0; i < values.length; i += 1) {
+      if (values[i] === null || values[i] === undefined || values[i] === '') {
+        continue
+      }
+      const count = Number(values[i])
+      if (Number.isFinite(count) && count >= 0) {
+        return count
+      }
+    }
+    return 0
+  }
+  function readWorkbenchStatCount(stats, keys) {
+    if (!stats || typeof stats !== 'object' || !Array.isArray(keys)) return null
+    for (let i = 0; i < keys.length; i += 1) {
+      const key = keys[i]
+      if (!Object.prototype.hasOwnProperty.call(stats, key)) continue
+      const count = Number(stats[key])
+      if (Number.isFinite(count) && count >= 0) {
+        return count
+      }
+    }
+    return null
+  }
+  function sumWorkbenchPendingCount(stats) {
+    if (!stats || typeof stats !== 'object') return null
+    const response = readWorkbenchStatCount(stats, ['response', 'responseCount', 'waitingResponseCount'])
+    const service = readWorkbenchStatCount(stats, ['service', 'serviceCount', 'waitingServiceCount'])
+    const dispute = readWorkbenchStatCount(stats, ['dispute', 'disputeCount', 'priceObjectionCount'])
+    if (response === null && service === null && dispute === null) {
+      return null
+    }
+    return (response || 0) + (service || 0) + (dispute || 0)
+  }
   const mealPeriodOptions = [
     { label: '早餐', value: 'breakfast' },
     { label: '午餐', value: 'lunch' },
@@ -210,9 +247,37 @@
         return chefStatus.isChefNormal(this.chefProfile)
       },
       revenueOverview() {
-        return this.chefWorkbench.revenueOverview || {}
+        const overview = { ...(this.chefWorkbench.revenueOverview || {}) }
+        const baseSalary = this.resolveRevenueBaseSalary(overview)
+        const commissionAmount = this.readAmount(overview.monthCommissionAmount)
+        const payableAmount = this.readAmount(overview.monthPayableAmount)
+        if (baseSalary !== null) {
+          overview.monthBaseSalary = baseSalary
+        }
+        if (baseSalary !== null && commissionAmount !== null) {
+          const computedPayableAmount = baseSalary + commissionAmount
+          if (payableAmount === null || (payableAmount === 0 && (baseSalary > 0 || commissionAmount > 0))) {
+            overview.monthPayableAmount = computedPayableAmount
+          }
+        }
+        return overview
+      },
+      orderReminderCount() {
+        const stats = this.chefWorkbench.orderStats || {}
+        return readWorkbenchCount(
+          sumWorkbenchPendingCount(stats),
+          this.chefWorkbench.orderReminderCount
+        )
+      },
+      orderReminderBadgeText() {
+        return this.orderReminderCount > 99 ? '99+' : String(this.orderReminderCount)
       },
       revenueCards() {
+        const payableAmount = this.resolveDisplayPayableAmount({
+          baseSalary: this.revenueOverview.monthBaseSalary,
+          commissionAmount: this.revenueOverview.monthCommissionAmount,
+          payableAmount: this.revenueOverview.monthPayableAmount
+        })
         return [
           { label: '今日收入', value: this.formatMoney(this.revenueOverview.todayIncome) },
           {
@@ -224,8 +289,8 @@
           { label: '本月完成', value: `${this.formatCount(this.revenueOverview.monthCompletedOrders)} 单` },
           {
             label: '应发金额',
-            value: this.formatMoney(this.revenueOverview.monthPayableAmount),
-            extra: `扣款 ${this.formatMoney(this.revenueOverview.monthDeduction)}`
+            value: this.formatMoney(payableAmount),
+            extra: `底薪 ${this.formatMoney(this.revenueOverview.monthBaseSalary)} · 扣款 ${this.formatMoney(this.revenueOverview.monthDeduction)}`
           }
         ]
       },
@@ -240,7 +305,11 @@
         })
       },
       revenueTrend() {
-        const trend = Array.isArray(this.chefWorkbench.revenueTrend) ? this.chefWorkbench.revenueTrend : []
+        const trend = Array.isArray(this.chefWorkbench.revenueTrend) ? this.chefWorkbench.revenueTrend.slice().sort((a, b) => {
+          const right = String((b && (b.date || b.label)) || '')
+          const left = String((a && (a.date || a.label)) || '')
+          return right.localeCompare(left)
+        }) : []
         const maxTrendAmount = trend.reduce((max, item) => {
           const amount = Number(item.amount) || 0
           return amount > max ? amount : max
@@ -257,6 +326,9 @@
     },
     onLoad() {
       this.initRegionPicker()
+      this.loadPage()
+    },
+    onShow() {
       this.loadPage()
     },
     methods: {
@@ -496,6 +568,27 @@
         if (!value) return []
         if (Array.isArray(value)) return value.filter(Boolean)
         return String(value).split(/[、,，/／\s]+/).filter(Boolean)
+      },
+      resolveRevenueBaseSalary(overview) {
+        const workbenchBaseSalary = this.readAmount(overview && overview.monthBaseSalary)
+        if (workbenchBaseSalary !== null) {
+          return workbenchBaseSalary
+        }
+        return this.readAmount(this.chefProfile && this.chefProfile.baseSalary)
+      },
+      resolveDisplayPayableAmount(payload) {
+        const baseSalary = this.readAmount(payload && (payload.baseSalary !== undefined ? payload.baseSalary : payload.monthBaseSalary))
+        const commissionAmount = this.readAmount(payload && (payload.commissionAmount !== undefined ? payload.commissionAmount : payload.monthCommissionAmount))
+        if (baseSalary !== null && commissionAmount !== null) {
+          return baseSalary + commissionAmount
+        }
+        const payableAmount = this.readAmount(payload && payload.payableAmount)
+        return payableAmount === null ? 0 : payableAmount
+      },
+      readAmount(value) {
+        if (value === undefined || value === null || value === '') return null
+        const amount = Number(value)
+        return Number.isFinite(amount) ? amount : null
       },
       formatMoney(value) {
         const amount = Number(value)
@@ -842,6 +935,26 @@
     font-size: 26rpx;
   }
 
+  .dashboard-link-wrap {
+    display: flex;
+    align-items: center;
+    gap: 10rpx;
+  }
+
+  .dashboard-badge {
+    min-width: 36rpx;
+    height: 36rpx;
+    padding: 0 10rpx;
+    box-sizing: border-box;
+    line-height: 36rpx;
+    border-radius: 999rpx;
+    background: #e85d34;
+    color: #fff;
+    font-size: 20rpx;
+    text-align: center;
+    font-weight: 600;
+  }
+
   .revenue-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -880,6 +993,9 @@
 
   .revenue-extra {
     margin-top: 8rpx;
+    display: block;
+    white-space: pre-line;
+    line-height: 1.45;
   }
 
   .alerts-card,

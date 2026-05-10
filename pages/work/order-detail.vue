@@ -105,6 +105,13 @@
     [orderStatus.ORDER_STATUS.WAITING_CONFIRM]: 'confirm',
     [orderStatus.ORDER_STATUS.COMPLETED]: 'done'
   }
+  const CHEF_STATUS_TEXT_MAP = {
+    [orderStatus.ORDER_STATUS.WAITING_RESPONSE]: '待接单报价',
+    [orderStatus.ORDER_STATUS.PRICE_OBJECTION]: '报价异议',
+    [orderStatus.ORDER_STATUS.WAITING_SERVICE]: '待服务',
+    [orderStatus.ORDER_STATUS.WAITING_CONFIRM]: '用户待确认',
+    [orderStatus.ORDER_STATUS.COMPLETED]: '已完成'
+  }
 
   function chefOrderStatusGroup(status) {
     return CHEF_ORDER_GROUP_MAP[orderStatus.normalizeOrderStatus(status)] || ''
@@ -132,15 +139,9 @@
         return chefOrderStatusGroup(this.status) || 'other'
       },
       statusText() {
-        const map = {
-          response: '待接单报价',
-          dispute: '报价异议',
-          service: '待服务',
-          confirm: '用户待确认',
-          done: '已完成',
-          other: '处理中'
-        }
-        return this.order.statusName || this.order.orderStatusName || map[this.group]
+        return orderStatus.displayOrderStatusText(this.order.statusName || this.order.orderStatusName, CHEF_STATUS_TEXT_MAP) ||
+          orderStatus.displayOrderStatusText(this.status, CHEF_STATUS_TEXT_MAP) ||
+          '处理中'
       },
       statusTone() {
         if (this.group === 'response' || this.group === 'dispute') return 'warn'
@@ -231,7 +232,7 @@
           quoteDescription: this.quoteForm.quoteRemark
         })).then(() => {
           this.$modal.msgSuccess(this.canHandleDispute ? '异议报价已提交' : '报价已提交')
-          this.load()
+          uni.navigateBack()
         }).finally(() => {
           this.submitting = false
         })
@@ -241,7 +242,7 @@
           this.submitting = true
           rejectChefOrder(this.orderPayload({ reason: this.rejectReason, rejectReason: this.rejectReason })).then(() => {
             this.$modal.msgSuccess('已拒绝预约')
-            this.load()
+            uni.navigateBack()
           }).finally(() => {
             this.submitting = false
           })
@@ -264,7 +265,7 @@
             this.submitting = true
             startServiceChefOrder(this.orderPayload()).then(() => {
               this.$modal.msgSuccess('已开始服务')
-              this.load()
+              uni.navigateBack()
             }).finally(() => {
               this.submitting = false
             })
@@ -285,7 +286,7 @@
             this.submitting = true
             serviceCompleteChefOrder(this.orderPayload()).then(() => {
               this.$modal.msgSuccess('已提交服务完成')
-              this.load()
+              uni.navigateBack()
             }).finally(() => {
               this.submitting = false
             })
@@ -318,7 +319,7 @@
           if (this.$refs.rejectServicePopup) {
             this.$refs.rejectServicePopup.close()
           }
-          this.load()
+            uni.navigateBack()
         }).finally(() => {
           this.submitting = false
         })

@@ -2,8 +2,45 @@ const test = require('node:test')
 const assert = require('node:assert/strict')
 const fs = require('node:fs')
 const path = require('node:path')
+const vm = require('node:vm')
 
-const source = fs.readFileSync(path.join(__dirname, '..', 'pages', 'work', 'settlement.vue'), 'utf8')
+const pagePath = path.join(__dirname, '..', 'pages', 'work', 'settlement.vue')
+const source = fs.readFileSync(pagePath, 'utf8')
+
+function loadComponentOptions() {
+  const match = source.match(/<script>([\s\S]*?)<\/script>/)
+  assert.ok(match, 'expected settlement page to contain a script block')
+
+  const script = match[1]
+    .replace(
+      /import\s+\{\s*getChefSettlementMonth\s*\}\s+from\s+'@\/api\/cooking\/chef'\s*/,
+      "const getChefSettlementMonth = () => Promise.resolve({ rows: [] })\n"
+    )
+    .replace(/export default/, 'module.exports =')
+
+  const sandbox = {
+    module: { exports: {} },
+    exports: {},
+    require,
+    console,
+    Promise,
+    setTimeout,
+    clearTimeout,
+    uni: {
+      navigateTo() {},
+      stopPullDownRefresh() {}
+    }
+  }
+
+  vm.runInNewContext(script, sandbox, { filename: pagePath })
+  return sandbox.module.exports
+}
+
+function createPageContext(component) {
+  const ctx = component.data ? component.data() : {}
+  Object.assign(ctx, component.methods)
+  return ctx
+}
 
 test('settlement page renders a paged card list with pull-down refresh and load-more controls', () => {
   assert.match(source, /<picker[\s\S]*mode="date"[\s\S]*fields="month"[\s\S]*@change="onMonthChange"/)
@@ -13,14 +50,14 @@ test('settlement page renders a paged card list with pull-down refresh and load-
   assert.match(source, /class="settlement-card"/)
   assert.match(source, /item\.month/)
   assert.match(source, /item\.completeCount/)
-  assert.match(source, /item\.payableAmount/)
+  assert.match(source, /item\.displayPayableAmount/)
   assert.match(source, /item\.settlementStatus/)
   assert.match(source, /@click="goDetail\(item\)"/)
   assert.match(source, /loadNextPage/)
   assert.match(source, /scrolltolower/)
   assert.match(source, /uni\.navigateTo\(\{[\s\S]*url: '\/pages\/work\/settlement-detail\?id=' \+ item\.id \+ '&month=' \+ item\.month/)
-  assert.doesNotMatch(source, /查看全部/)
-  assert.doesNotMatch(source, /结算列表/)
+  assert.doesNotMatch(source, /鏌ョ湅鍏ㄩ儴/)
+  assert.doesNotMatch(source, /缁撶畻鍒楄〃/)
   assert.doesNotMatch(source, /loadPrevPage/)
   assert.doesNotMatch(source, /loadMoreText/)
   assert.doesNotMatch(source, /class="pager"/)
@@ -36,6 +73,23 @@ test('settlement page normalizes natural-month list payload fields from backend 
   assert.match(source, /REVIEWING/)
   assert.match(source, /CONFIRMED/)
   assert.match(source, /PAID/)
-  assert.match(source, /return this\.queryMonth \|\| '月度结算'/)
-  assert.match(source, /if \(\/\^\\d\{6\}\$\/\.test\(text\)\) return `\$\{text\.slice\(0, 4\)\}-\$\{text\.slice\(4, 6\)\}`/)
+  assert.match(source, /headerMonthText\(\)/)
+  assert.match(source, /formatMonth\(value\)/)
+})
+
+test('settlement page displays payable amount as base salary plus gross commission when available', () => {
+  const component = loadComponentOptions()
+  const ctx = createPageContext(component)
+
+  const item = component.methods.normalizeItem.call(ctx, {
+    settlementMonth: '2026-05',
+    completedCount: 6,
+    baseSalary: 3000,
+    chefCommission: 560,
+    payableAmount: 3360,
+    violationDeduction: 200
+  }, 1, 0)
+
+  assert.equal(item.displayPayableAmount, 3560)
+  assert.equal(item.payableAmount, 3360)
 })

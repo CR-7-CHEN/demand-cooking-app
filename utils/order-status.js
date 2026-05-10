@@ -40,18 +40,40 @@ const STATUS_ALIASES = Object.freeze({
   WAIT_CONFIRM: ORDER_STATUS.WAITING_CONFIRM
 });
 
+const REFUND_STATUSES = Object.freeze([
+  'REFUNDING',
+  'REFUNDED',
+  'REFUND_FAILED'
+]);
+
 const CLOSED_STATUSES = [
   'REJECTED_CLOSED',
   'RESPONSE_TIMEOUT_CLOSED',
   'OBJECTION_TIMEOUT_CLOSED',
   'PAY_TIMEOUT_CLOSED',
   'CANCELED',
-  'REFUNDING',
-  'REFUNDED',
-  'REFUND_FAILED'
+  ...REFUND_STATUSES
 ];
 
+const REFUND_STATUS_SET = new Set(REFUND_STATUSES);
 const CLOSED_STATUS_SET = new Set(CLOSED_STATUSES);
+
+const DEFAULT_STATUS_TEXT_MAP = Object.freeze({
+  [ORDER_STATUS.WAITING_RESPONSE]: '待响应',
+  [ORDER_STATUS.WAITING_PAY]: '待支付',
+  [ORDER_STATUS.PRICE_OBJECTION]: '异议中',
+  [ORDER_STATUS.WAITING_SERVICE]: '待服务',
+  [ORDER_STATUS.WAITING_CONFIRM]: '待确认',
+  [ORDER_STATUS.COMPLETED]: '已完成',
+  REJECTED_CLOSED: '已拒绝',
+  RESPONSE_TIMEOUT_CLOSED: '响应超时关闭',
+  OBJECTION_TIMEOUT_CLOSED: '异议超时关闭',
+  PAY_TIMEOUT_CLOSED: '支付超时关闭',
+  CANCELED: '已取消',
+  REFUNDING: '退款中',
+  REFUNDED: '已退款',
+  REFUND_FAILED: '退款失败'
+});
 
 const USER_ORDER_STATUS_GROUPS = Object.freeze({
   reserved: [ORDER_STATUS.WAITING_RESPONSE],
@@ -115,6 +137,19 @@ function isOrderStatus(status, key) {
   return normalizedStatus !== '' && normalizedStatus === normalizedKey;
 }
 
+function isRefundOrderStatus(status) {
+  if (status === null || status === undefined) {
+    return false;
+  }
+
+  const raw = String(status).trim().toUpperCase();
+  if (raw === '') {
+    return false;
+  }
+
+  return REFUND_STATUS_SET.has(raw);
+}
+
 function isCompletedOrder(status) {
   return isOrderStatus(status, ORDER_STATUS.COMPLETED);
 }
@@ -128,6 +163,39 @@ function tabOfUserStatus(status) {
   return USER_ORDER_STATUS_GROUPS[group] ? group : '';
 }
 
+function displayOrderStatusText(status, overrideMap) {
+  if (status === null || status === undefined) {
+    return '';
+  }
+
+  const rawText = String(status).trim();
+  if (!rawText) {
+    return '';
+  }
+
+  const rawStatus = rawText.toUpperCase();
+  const normalized = normalizeOrderStatus(status);
+  const map = overrideMap || {};
+
+  if (Object.prototype.hasOwnProperty.call(map, normalized)) {
+    return map[normalized];
+  }
+
+  if (Object.prototype.hasOwnProperty.call(map, rawStatus)) {
+    return map[rawStatus];
+  }
+
+  if (Object.prototype.hasOwnProperty.call(DEFAULT_STATUS_TEXT_MAP, normalized)) {
+    return DEFAULT_STATUS_TEXT_MAP[normalized];
+  }
+
+  if (Object.prototype.hasOwnProperty.call(DEFAULT_STATUS_TEXT_MAP, rawStatus)) {
+    return DEFAULT_STATUS_TEXT_MAP[rawStatus];
+  }
+
+  return /^[A-Z0-9_]+$/.test(rawText) ? '' : rawText;
+}
+
 module.exports = {
   ORDER_STATUS,
   NUMBER_STATUS_MAP,
@@ -137,7 +205,9 @@ module.exports = {
   normalizeOrderStatus,
   orderStatusGroup,
   isOrderStatus,
+  isRefundOrderStatus,
   isCompletedOrder,
+  displayOrderStatusText,
   statusesOfUserTab,
   tabOfUserStatus
 };
