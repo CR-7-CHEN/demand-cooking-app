@@ -39,11 +39,11 @@ test('chef detail description prefers backend intro field', () => {
   const chef = component.methods.normalizeChef.call(ctx, {
     chefId: 12,
     chefName: 'Chef',
-    intro: '后台做饭人员简介',
+    intro: '后台服务厨师简介',
     description: '旧描述字段',
     introduction: '旧介绍字段',
     remark: '备注字段'
   })
 
-  assert.equal(chef.description, '后台做饭人员简介')
+  assert.equal(chef.description, '后台服务厨师简介')
 })

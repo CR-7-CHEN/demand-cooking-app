@@ -30,7 +30,7 @@
 
   const localFaqs = [{
     question: '如何预约上门做饭',
-    answer: '进入首页选择做饭人员、服务时间、地址和菜品需求，提交后等待做饭人员响应。'
+    answer: '进入首页选择服务厨师、服务时间、地址和菜品需求，提交后等待服务厨师响应。'
   }, {
     question: '食材由谁准备',
     answer: '第一版以下单页面的订单信息为准，通常可由用户自备食材，并在备注中说明口味、忌口和厨房条件。'
@@ -151,7 +151,7 @@
       },
       statusText(status) {
         const map = {
-          WAITING_RESPONSE: '待做饭人员响应',
+          WAITING_RESPONSE: '待服务厨师响应',
           WAITING_PAY: '待支付',
           PRICE_OBJECTION: '报价异议处理中',
           WAITING_SERVICE: '待上门服务',

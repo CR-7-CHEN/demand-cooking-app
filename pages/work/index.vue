@@ -164,7 +164,7 @@
         return this.isChefWorkbenchAvailable ? this.chefName : '服务中心'
       },
       chefName() {
-        return this.chef.realName || this.chef.name || this.chef.nickName || this.$store.state.user.name || '做饭人员'
+        return this.chef.realName || this.chef.name || this.chef.nickName || this.$store.state.user.name || '服务厨师'
       },
       chefAvatar() {
         return this.chef.avatarUrl || this.chef.avatar || this.$store.state.user.avatar || '/static/images/profile.jpg'
@@ -229,8 +229,8 @@
             tone: 'green'
           },
           {
-            title: '申请成为做饭人员',
-            description: '提交做饭人员资料，申请开通工作台能力',
+            title: '申请成为服务厨师',
+            description: '提交服务厨师资料，申请开通工作台能力',
             url: '/pages/work/profile',
             badge: '申',
             tone: 'red',
@@ -384,7 +384,7 @@
         if (item.action === 'applyChef') {
           uni.showModal({
             title: '申请入驻',
-            content: '是否申请入驻成为做饭人员?',
+            content: '是否申请入驻成为服务厨师?',
             cancelText: '否',
             confirmText: '是',
             success: (res) => {
@@ -413,7 +413,7 @@
         if (this.needApply) {
           uni.showModal({
             title: '入驻确认',
-            content: '是否入驻成为做饭人员？',
+            content: '是否入驻成为服务厨师？',
             cancelText: '否',
             confirmText: '是',
             success: (res) => {

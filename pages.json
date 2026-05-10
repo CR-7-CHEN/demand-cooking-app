@@ -18,7 +18,7 @@
   }, {
     "path": "pages/user/chef-detail",
     "style": {
-      "navigationBarTitleText": "做饭人员详情"
+      "navigationBarTitleText": "服务厨师详情"
     }
   }, {
     "path": "pages/user/address",

@@ -126,10 +126,10 @@
     </view>
 
     <view v-if="showChefRecommendations" class="section-head">
-      <text class="section-title">推荐做饭人员</text>
+      <text class="section-title">推荐服务厨师</text>
     </view>
 
-    <view v-if="showChefRecommendations && loading" class="state-box">正在寻找合适的做饭人员...</view>
+    <view v-if="showChefRecommendations && loading" class="state-box">正在寻找合适的服务厨师...</view>
     <view v-else-if="showChefRecommendations && chefs.length === 0" class="state-box">暂无可预约人员，可更换区域后再试</view>
 
     <view v-else-if="showChefRecommendations" class="chef-list">
@@ -527,7 +527,7 @@
         return {
           raw: item,
           id: item.id || item.chefId || item.userChefId,
-          name: item.name || item.chefName || item.realName || '做饭人员',
+          name: item.name || item.chefName || item.realName || '服务厨师',
           avatar: item.avatar || item.avatarUrl || item.photo || defaultAvatar,
           rating: this.formatChefRating(this.pickChefRating(item)),
           completedCount: item.completedCount || item.completeCount || item.orderCount || item.finishedOrderCount || item.completedOrders || 0,

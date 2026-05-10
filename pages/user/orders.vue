@@ -20,7 +20,7 @@
           <view class="order-no">{{ order.orderNo || '预约订单' }}</view>
           <view class="status">{{ statusText(order.status) }}</view>
         </view>
-        <view class="line">做饭人员：{{ chefDisplayName(order) }}</view>
+        <view class="line">服务厨师：{{ chefDisplayName(order) }}</view>
         <view class="line">上门时间：{{ order.startTime || order.appointmentStartTime || order.serviceStartTime || '-' }}</view>
         <view class="line">服务区域：{{ order.serviceArea || order.areaName || '-' }}</view>
         <view class="footer">

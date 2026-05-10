@@ -1,7 +1,7 @@
 import request from '@/utils/request'
 import upload from '@/utils/upload'
 
-// 做饭人员资料
+// 服务厨师资料
 export function getChefMy() {
   return request({
     url: '/cooking/chef/my',
@@ -106,7 +106,7 @@ export function deleteChefTime(id) {
   })
 }
 
-// 做饭人员订单
+// 服务厨师订单
 export function getChefOrderList(params) {
   return request({
     url: '/cooking/order/chef/list',

@@ -35,7 +35,7 @@
 
     <view v-else-if="unavailable" class="state-card">
       <view class="empty-title">暂不可查看</view>
-      <view class="empty-text">该页面仅审核通过且未离职/未禁用的做饭人员可用</view>
+      <view class="empty-text">该页面仅审核通过且未离职/未禁用的服务厨师可用</view>
     </view>
 
     <view v-else-if="rows.length === 0" class="state-card warm-empty">

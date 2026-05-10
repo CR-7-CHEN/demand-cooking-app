@@ -1,7 +1,7 @@
 <template>
   <view class="normal-login-container">
     <view class="logo-content align-center justify-center flex">
-      <text class="title">上门做饭管理系统</text>
+      <text class="title">上门家厨管理系统</text>
     </view>
     <view class="login-form-content">
       <view class="input-item flex align-center">

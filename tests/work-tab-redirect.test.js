@@ -75,7 +75,7 @@ test('work tab keeps ordinary users on the page and exposes service center actio
   assert.match(source, /地址管理/)
   assert.match(source, /在线客服/)
   assert.match(source, /常见问题/)
-  assert.match(source, /申请成为做饭人员/)
+  assert.match(source, /申请成为服务厨师/)
   assert.match(source, /uni\.setTabBarItem\(/)
   assert.match(source, /uni\.setNavigationBarTitle\(/)
   assert.match(source, /requiresLogin:\s*true/)
@@ -142,14 +142,14 @@ test('work tab service center apply action confirms before opening the chef prof
   })
 
   const serviceCenterActions = component.computed.serviceCenterActions.call(ctx)
-  const applyEntry = serviceCenterActions.find(item => item.title === '申请成为做饭人员')
+  const applyEntry = serviceCenterActions.find(item => item.title === '申请成为服务厨师')
   assert.ok(applyEntry, 'expected apply entry to exist')
 
   component.methods.handleServiceCenterAction.call(ctx, applyEntry)
 
   assert.equal(modalCalls.length, 1)
   assert.equal(modalCalls[0].title, '申请入驻')
-  assert.equal(modalCalls[0].content, '是否申请入驻成为做饭人员?')
+  assert.equal(modalCalls[0].content, '是否申请入驻成为服务厨师?')
   assert.equal(modalCalls[0].confirmText, '是')
   assert.equal(modalCalls[0].cancelText, '否')
   assert.deepEqual(calls, [])

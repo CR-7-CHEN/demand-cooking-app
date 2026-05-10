@@ -151,7 +151,7 @@
 
       <view class="rule-card">
         <view class="rule-title">结算口径</view>
-        <view class="rule-line">已完成且未退款订单计入结算；退款中、已退款、退款失败和做饭人员原因取消订单不计入。</view>
+        <view class="rule-line">已完成且未退款订单计入结算；退款中、已退款、退款失败和服务厨师原因取消订单不计入。</view>
         <view class="rule-line">当月违约达到 5 次且单子提成不少于 200 元时，从当月提成扣除 200 元，不扣个人底薪。</view>
       </view>
     </block>

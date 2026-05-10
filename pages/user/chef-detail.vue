@@ -16,8 +16,8 @@
     </view>
 
     <view class="card">
-      <view class="card-title">做饭人员介绍</view>
-      <view class="desc">{{ chef.description || '这位做饭人员还没有填写详细介绍，可先根据评分、菜系和服务区域判断是否适合。' }}</view>
+      <view class="card-title">服务厨师介绍</view>
+      <view class="desc">{{ chef.description || '这位服务厨师还没有填写详细介绍，可先根据评分、菜系和服务区域判断是否适合。' }}</view>
     </view>
 
     <view class="card">
@@ -131,7 +131,7 @@
         chefId: '',
         chef: {
           avatar: defaultAvatar,
-          name: '做饭人员',
+          name: '服务厨师',
           cuisines: [],
           serviceAreaText: '',
           availableTimeText: '可预约时间待确认',
@@ -220,7 +220,7 @@
         const areas = this.toArray(item.serviceAreas || item.serviceArea || item.serviceAreaNames || item.area)
         return {
           id: item.id || item.chefId || this.chefId,
-          name: item.name || item.chefName || item.realName || '做饭人员',
+          name: item.name || item.chefName || item.realName || '服务厨师',
           avatar: item.avatar || item.avatarUrl || item.photo || defaultAvatar,
           rating: this.pickChefRating(item),
           completedCount: item.completedCount || item.completeCount || item.orderCount || item.finishedOrderCount || 0,

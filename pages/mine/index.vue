@@ -65,7 +65,7 @@
 
       <view v-if="chefAction" class="chef-action-card">
         <view class="chef-action-main">
-          <view class="chef-action-label">做饭人员入驻</view>
+          <view class="chef-action-label">服务厨师入驻</view>
           <view class="chef-action-title">{{ chefAction.title }}</view>
           <view class="chef-action-desc">{{ chefAction.description }}</view>
         </view>

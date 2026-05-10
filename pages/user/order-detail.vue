@@ -9,7 +9,7 @@
 
     <view class="card">
       <view class="card-title">预约信息</view>
-      <view class="row"><text>做饭人员</text><text>{{ order.chefName || '-' }}</text></view>
+      <view class="row"><text>服务厨师</text><text>{{ order.chefName || '-' }}</text></view>
       <view class="row"><text>菜品需求</text><text>{{ order.dishText || order.dishSnapshot || '-' }}</text></view>
       <view class="row"><text>备注</text><text>{{ order.remark || order.userRemark || '-' }}</text></view>
       <view class="row"><text>报价</text><text class="price">{{ order.quoteAmount ? '¥' + order.quoteAmount : '待报价' }}</text></view>
@@ -140,14 +140,14 @@
         const normalized = orderStatus.normalizeOrderStatus(status)
         const rawStatus = String(status || '').trim().toUpperCase()
         const map = {
-          [orderStatus.ORDER_STATUS.WAITING_RESPONSE]: '待做饭人员响应',
+          [orderStatus.ORDER_STATUS.WAITING_RESPONSE]: '待服务厨师响应',
           [orderStatus.ORDER_STATUS.WAITING_PAY]: '待用户支付',
           [orderStatus.ORDER_STATUS.PRICE_OBJECTION]: '报价异议中',
           [orderStatus.ORDER_STATUS.WAITING_SERVICE]: '待服务',
           [orderStatus.ORDER_STATUS.WAITING_CONFIRM]: '待用户确认',
           [orderStatus.ORDER_STATUS.COMPLETED]: '已完成',
-          WAITING_RESPONSE: '待做饭人员响应',
-          REJECTED_CLOSED: '做饭人员已拒绝',
+          WAITING_RESPONSE: '待服务厨师响应',
+          REJECTED_CLOSED: '服务厨师已拒绝',
           RESPONSE_TIMEOUT_CLOSED: '响应超时关闭',
           WAITING_PAY: '待用户支付',
           PRICE_OBJECTION: '报价异议中',

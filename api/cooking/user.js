@@ -1,6 +1,6 @@
 import request from '@/utils/request'
 
-// 做饭人员列表
+// 服务厨师列表
 export function listChefs(params) {
   return request({
     url: '/cooking/app/chef/list',
@@ -9,7 +9,7 @@ export function listChefs(params) {
   })
 }
 
-// 做饭人员详情
+// 服务厨师详情
 export function getChef(id) {
   return request({
     url: `/cooking/app/chef/${id}`,
