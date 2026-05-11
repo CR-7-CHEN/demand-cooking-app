@@ -10,7 +10,7 @@
     <view class="card">
       <view class="card-title">预约信息</view>
       <view class="row"><text>服务厨师</text><text>{{ order.chefName || '-' }}</text></view>
-      <view class="row"><text>菜品需求</text><text>{{ order.dishText || order.dishSnapshot || '-' }}</text></view>
+      <view class="row"><text>菜品需求</text><text>{{ order.dishText || '-' }}</text></view>
       <view class="row"><text>备注</text><text>{{ order.remark || order.userRemark || '-' }}</text></view>
       <view class="row"><text>报价</text><text class="price">{{ order.quoteAmount ? '¥' + order.quoteAmount : '待报价' }}</text></view>
       <view v-if="order.quoteRemark" class="quote-remark">{{ order.quoteRemark }}</view>
@@ -129,8 +129,60 @@
           startTime: data.startTime || data.appointmentStartTime || data.serviceStartTime,
           chefName: data.chefName || (data.chef && data.chef.name) || data.cookName,
           addressText: address,
-          dishText: data.dishText || data.dishesText || data.customDishNames
+          dishText: this.formatDishDemand(data.dishText || data.dishesText || data.customDishNames || data.dishSnapshot)
         }
+      },
+      formatDishDemand(value) {
+        if (value === null || value === undefined || value === '') return ''
+        if (Array.isArray(value)) return this.joinDishNames(value)
+        if (typeof value === 'object') return this.formatDishDemandObject(value)
+
+        const text = String(value).trim()
+        if (!text) return ''
+        if (!/^[\[{]/.test(text)) return text
+
+        try {
+          const parsed = JSON.parse(text)
+          const formatted = Array.isArray(parsed) ? this.joinDishNames(parsed) : this.formatDishDemandObject(parsed)
+          return formatted || text
+        } catch (e) {
+          return text
+        }
+      },
+      formatDishDemandObject(data) {
+        if (!data || typeof data !== 'object') return ''
+        const parts = []
+        const dishNames = []
+
+        if (Array.isArray(data.dishes)) {
+          dishNames.push(...this.collectDishNames(data.dishes))
+        }
+        if (Array.isArray(data.dishList)) {
+          dishNames.push(...this.collectDishNames(data.dishList))
+        }
+        const customNames = data.customDishNames
+        if (Array.isArray(customNames)) {
+          dishNames.push(...customNames.map(item => String(item || '').trim()).filter(Boolean))
+        } else if (customNames) {
+          dishNames.push(...String(customNames).split(/[,;，；、\n]+/).map(item => item.trim()).filter(Boolean))
+        }
+
+        if (dishNames.length) parts.push(dishNames.join('、'))
+        ;[data.tasteRemark, data.materialRemark, data.remark].forEach(item => {
+          const text = String(item || '').trim()
+          if (text) parts.push(text)
+        })
+        return parts.join('；')
+      },
+      collectDishNames(list) {
+        return list.map(item => {
+          if (typeof item === 'string') return item.trim()
+          if (!item || typeof item !== 'object') return ''
+          return String(item.name || item.dishName || item.title || '').trim()
+        }).filter(Boolean)
+      },
+      joinDishNames(list) {
+        return this.collectDishNames(list).join('、')
       },
       getServiceStartedTime(order) {
         if (!order) return ''

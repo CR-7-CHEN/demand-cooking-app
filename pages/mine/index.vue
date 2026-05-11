@@ -178,12 +178,13 @@
           }
         }
         if (chefStatus.isChefRejected(chef)) {
+          const rejectReason = chefStatus.getChefRejectReason(chef)
           return {
             title: '入驻资料待完善',
-            description: '根据驳回原因补充资料后重新提交审核',
+            description: rejectReason ? `驳回原因：${rejectReason}` : '根据驳回原因补充资料后重新提交审核',
             buttonText: '完善资料',
             dialogTitle: '完善入驻资料',
-            dialogContent: '请根据驳回原因完善资料，确认后前往资料页继续提交。'
+            dialogContent: rejectReason ? `驳回原因：${rejectReason}。确认后前往资料页继续提交。` : '请根据驳回原因完善资料，确认后前往资料页继续提交。'
           }
         }
         if (chefStatus.hasChefProfile(chef)) {

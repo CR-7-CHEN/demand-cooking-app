@@ -61,6 +61,11 @@ function isChefWorkbenchAvailable(chef) {
   return isChefApproved(chef) && (isChefNormal(chef) || isChefPaused(chef));
 }
 
+function getChefRejectReason(chef) {
+  if (!chef) return '';
+  return normalizeStatus(chef.auditReason || chef.rejectReason || chef.auditRejectReason || chef.reason);
+}
+
 function shouldShowChefRecommendations(chef) {
   return !isChefWorkbenchAvailable(chef);
 }
@@ -93,6 +98,7 @@ module.exports = {
   isChefDisabled,
   isChefResigned,
   isChefWorkbenchAvailable,
+  getChefRejectReason,
   shouldShowChefRecommendations,
   needChefApply,
   resolveOrderPage

@@ -17,7 +17,7 @@
 
     <view class="card">
       <view class="card-title">服务厨师介绍</view>
-      <view class="desc">{{ chef.description || '这位服务厨师还没有填写详细介绍，可先根据评分、菜系和服务区域判断是否适合。' }}</view>
+      <view class="desc">{{ chef.description || '这位服务厨师还没有填写详细介绍，可以先根据评分、菜系和服务区域判断是否适合。' }}</view>
     </view>
 
     <view class="card">
@@ -58,14 +58,14 @@
 
       <view class="form-row">
         <view class="label">上门日期</view>
-        <picker mode="date" :start="today" :end="maxDate" :value="form.date" @change="changeDate">
-          <view class="picker-value">{{ form.date || '选择未来 3 天内日期' }}</view>
+        <picker :range="bookingDateOptions" :value="bookingDateIndex" @change="changeBookingDate">
+          <view class="picker-value">{{ form.date || '选择可预约日期' }}</view>
         </picker>
       </view>
       <view class="form-row">
         <view class="label">上门时间</view>
-        <picker mode="time" :value="form.time" @change="changeTime">
-          <view class="picker-value">{{ form.time || '选择整点/半点或自定义时间' }}</view>
+        <picker :range="bookingTimeOptions" :value="bookingTimeIndex" @change="changeBookingTime">
+          <view class="picker-value">{{ form.time || '选择可预约开始时间' }}</view>
         </picker>
       </view>
       <view class="hint">系统会从上门开始时间起锁定 3 小时，食材默认由用户自备。</view>
@@ -126,7 +126,6 @@
 
   export default {
     data() {
-      const now = new Date()
       return {
         chefId: '',
         chef: {
@@ -141,8 +140,7 @@
         selectedAddressIndex: -1,
         dishes: [],
         selectedDishIds: [],
-        today: this.formatDate(now),
-        maxDate: this.formatDate(new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000)),
+        bookingStartOptions: [],
         form: {
           date: '',
           time: '',
@@ -158,7 +156,23 @@
         return this.selectedAddressIndex >= 0 ? this.addresses[this.selectedAddressIndex] : null
       },
       availableTimeLines() {
-        return this.formatAvailableTimeLines(this.chef.availableTimeText)
+        return this.buildAvailableTimeLines(this.chef.availableTimes, this.chef.availableTimeText)
+      },
+      bookingDateOptions() {
+        return Array.from(new Set(this.bookingStartOptions.map(item => item.date)))
+      },
+      bookingDateIndex() {
+        const index = this.bookingDateOptions.indexOf(this.form.date)
+        return index > -1 ? index : 0
+      },
+      bookingTimeOptions() {
+        return this.bookingStartOptions
+          .filter(item => item.date === this.form.date)
+          .map(item => item.time)
+      },
+      bookingTimeIndex() {
+        const index = this.bookingTimeOptions.indexOf(this.form.time)
+        return index > -1 ? index : 0
       }
     },
     onLoad(option) {
@@ -179,6 +193,7 @@
         getChef(this.chefId).then(res => {
           const data = res.data || res.chef || res
           this.chef = this.normalizeChef(data)
+          this.syncBookingStartOptions()
         })
       },
       loadAddresses() {
@@ -218,6 +233,7 @@
       normalizeChef(item) {
         const cuisines = this.toArray(item.cuisines || item.cuisine || item.specialties || item.goodAt)
         const areas = this.toArray(item.serviceAreas || item.serviceArea || item.serviceAreaNames || item.area)
+        const availableTimes = this.normalizeAvailableTimes(item)
         return {
           id: item.id || item.chefId || this.chefId,
           name: item.name || item.chefName || item.realName || '服务厨师',
@@ -228,8 +244,31 @@
           serviceAreaText: areas.length ? areas.join('、') : '',
           recommended: item.recommended || item.recommendFlag || item.isRecommended,
           description: item.intro || item.description || item.introduction || item.profile || item.remark || '',
+          availableTimes,
           availableTimeText: this.formatAvailableTime(item),
           priceEstimateText: this.formatPriceEstimate(item)
+        }
+      },
+      normalizeAvailableTimes(item) {
+        const keys = ['availableTimes', 'availableTimeList', 'serviceTimes', 'serviceTimeList', 'workTimes']
+        for (let i = 0; i < keys.length; i += 1) {
+          const value = item && item[keys[i]]
+          if (Array.isArray(value)) {
+            return value
+              .map(time => this.normalizeAvailableTimeItem(time))
+              .filter(time => time.startTime && time.endTime)
+          }
+        }
+        return []
+      },
+      normalizeAvailableTimeItem(item) {
+        if (!item || typeof item !== 'object') {
+          return { startTime: '', endTime: '', status: '0' }
+        }
+        return {
+          startTime: this.firstValue(item, ['startTime', 'serviceStartTime', 'availableStartTime', 'workStartTime']),
+          endTime: this.firstValue(item, ['endTime', 'serviceEndTime', 'availableEndTime', 'workEndTime']),
+          status: String(this.firstValue(item, ['status']) || '0')
         }
       },
       formatAvailableTime(item) {
@@ -256,10 +295,33 @@
       formatAvailableTimeLines(text) {
         const value = String(text || '可预约时间待确认').trim()
         return value
-          .split(/[;；\n]+/)
+          .split(/[;\n；]+/)
           .map(item => item.trim())
           .filter(Boolean)
-          .map(item => /^\d/.test(item) ? item : item.replace(/^([^:：]+)[:：]\s*/, '$1 '))
+          .map(item => {
+            if (/^\d/.test(item)) return item
+            const match = item.match(/^(.+?)\s*[:：]\s*(\d{1,2}:\d{2}.*)$/)
+            if (!match) return item
+            return `${match[1]} ${match[2]}`.trim()
+          })
+      },
+      buildAvailableTimeLines(availableTimes, fallbackText) {
+        const lines = (availableTimes || [])
+          .filter(item => item && item.startTime && item.endTime)
+          .slice()
+          .sort((a, b) => this.parseDateTime(b.startTime) - this.parseDateTime(a.startTime))
+          .map(item => this.formatAvailableTimeRange(item.startTime, item.endTime))
+          .filter(Boolean)
+        if (lines.length) return lines
+        return this.formatAvailableTimeLines(fallbackText)
+      },
+      formatAvailableTimeRange(startTime, endTime) {
+        const start = String(startTime || '').trim()
+        const end = String(endTime || '').trim()
+        if (!start || !end) return ''
+        const normalizedStart = start.replace('T', ' ').replace(/:\d{2}$/, '')
+        const normalizedEnd = end.replace('T', ' ').replace(/:\d{2}$/, '')
+        return `${normalizedStart} - ${normalizedEnd}`
       },
       formatPriceEstimate(item) {
         const directText = this.firstValue(item, ['priceText', 'priceEstimate', 'priceDescription', 'feeDescription'])
@@ -267,19 +329,19 @@
 
         const priceItems = [
           { label: '起步价', value: this.firstValue(item, ['startPrice', 'startingPrice', 'basePrice', 'minimumPrice']) },
-          { label: '服务价', value: this.firstValue(item, ['servicePrice', 'serviceFee', 'price']) },
-          { label: '小时价', value: this.firstValue(item, ['hourlyPrice', 'hourPrice', 'pricePerHour']) }
-        ].filter(item => item.value !== undefined && item.value !== null && item.value !== '')
+          { label: '服务费', value: this.firstValue(item, ['servicePrice', 'serviceFee', 'price']) },
+          { label: '小时费', value: this.firstValue(item, ['hourlyPrice', 'hourPrice', 'pricePerHour']) }
+        ].filter(priceItem => priceItem.value !== undefined && priceItem.value !== null && priceItem.value !== '')
 
         const seen = []
-        const texts = priceItems.map(item => {
-          const money = this.moneyText(item.value)
-          if (!money || seen.indexOf(`${item.label}:${money}`) !== -1) return ''
-          seen.push(`${item.label}:${money}`)
-          return `${item.label}${money}${item.label === '小时价' ? '/小时' : ''}`
+        const texts = priceItems.map(priceItem => {
+          const money = this.moneyText(priceItem.value)
+          if (!money || seen.indexOf(`${priceItem.label}:${money}`) !== -1) return ''
+          seen.push(`${priceItem.label}:${money}`)
+          return `${priceItem.label}${money}${priceItem.label === '小时费' ? '/小时' : ''}`
         }).filter(Boolean)
 
-        return texts.length ? texts.join('，') : '价格待报价，以报价为准'
+        return texts.length ? texts.join('；') : '价格待报价，以报价为准'
       },
       firstValue(item, keys) {
         for (let i = 0; i < keys.length; i += 1) {
@@ -298,10 +360,10 @@
         return String(value).trim()
       },
       moneyText(value) {
-        if (typeof value === 'number') return `￥${value}`
+        if (typeof value === 'number') return `¥${value}`
         const text = String(value).trim()
         if (!text) return ''
-        return /[￥元]/.test(text) ? text : `￥${text}`
+        return /[¥元]/.test(text) ? text : `¥${text}`
       },
       normalizeAddress(item) {
         const region = item.region || item.areaName || item.area || item.district || ''
@@ -332,7 +394,7 @@
       toArray(value) {
         if (!value) return []
         if (Array.isArray(value)) return value.filter(Boolean)
-        return String(value).split(/[、,，\s]+/).filter(Boolean)
+        return String(value).split(/[、，,\s]+/).filter(Boolean)
       },
       openAvailableTimePopup() {
         if (this.$refs.availableTimePopup) {
@@ -344,11 +406,112 @@
           this.$refs.availableTimePopup.close()
         }
       },
-      changeDate(e) {
-        this.form.date = e.detail.value
+      syncBookingStartOptions() {
+        this.bookingStartOptions = this.collectBookingStartOptions(this.chef.availableTimes || [])
+        if (!this.bookingStartOptions.length) {
+          this.form.date = ''
+          this.form.time = ''
+          return
+        }
+        const currentStart = this.buildStartTime()
+        const currentValid = this.bookingStartOptions.some(item => item.value === currentStart)
+        if (currentValid) return
+        const first = this.bookingStartOptions[0]
+        this.form.date = first.date
+        this.form.time = first.time
       },
-      changeTime(e) {
-        this.form.time = e.detail.value
+      collectBookingStartOptions(availableTimes, nowMs = Date.now()) {
+        const durationMs = 3 * 60 * 60 * 1000
+        const stepMs = 30 * 60 * 1000
+        const minStartMs = nowMs + 60 * 60 * 1000
+        const maxStartMs = nowMs + 3 * 24 * 60 * 60 * 1000
+        const seen = {}
+        const result = []
+        const parseDateTime = this && this.parseDateTime
+          ? value => this.parseDateTime(value)
+          : value => {
+            const time = new Date(String(value || '').replace(/-/g, '/')).getTime()
+            return Number.isFinite(time) ? time : 0
+          }
+        const formatDateTime = this && this.formatDateTime
+          ? value => this.formatDateTime(value)
+          : value => {
+            const month = String(value.getMonth() + 1).padStart(2, '0')
+            const day = String(value.getDate()).padStart(2, '0')
+            const hour = String(value.getHours()).padStart(2, '0')
+            const minute = String(value.getMinutes()).padStart(2, '0')
+            return `${value.getFullYear()}-${month}-${day} ${hour}:${minute}:00`
+          }
+        const formatDate = this && this.formatDate
+          ? value => this.formatDate(value)
+          : value => {
+            const month = String(value.getMonth() + 1).padStart(2, '0')
+            const day = String(value.getDate()).padStart(2, '0')
+            return `${value.getFullYear()}-${month}-${day}`
+          }
+        const formatClock = this && this.formatClock
+          ? value => this.formatClock(value)
+          : value => {
+            const hour = String(value.getHours()).padStart(2, '0')
+            const minute = String(value.getMinutes()).padStart(2, '0')
+            return `${hour}:${minute}`
+          }
+        const alignToNextHalfHour = this && this.alignToNextHalfHour
+          ? value => this.alignToNextHalfHour(value)
+          : value => {
+            if (!Number.isFinite(value) || value <= 0) return 0
+            const remainder = value % stepMs
+            return remainder === 0 ? value : value + (stepMs - remainder)
+          }
+        const pushOption = startMs => {
+          if (startMs < minStartMs || startMs > maxStartMs) return
+          const value = formatDateTime(new Date(startMs))
+          if (seen[value]) return
+          seen[value] = true
+          result.push({
+            value,
+            startTime: value,
+            date: formatDate(new Date(startMs)),
+            time: formatClock(new Date(startMs))
+          })
+        }
+        ;(availableTimes || []).forEach(item => {
+          if (!item || String(item.status) === '1') return
+          const rawStartMs = parseDateTime(item.startTime)
+          const rawEndMs = parseDateTime(item.endTime)
+          if (!rawStartMs || !rawEndMs || rawEndMs - rawStartMs < durationMs) return
+          const minCandidateMs = alignToNextHalfHour(Math.max(rawStartMs, minStartMs))
+          const maxCandidateMs = Math.min(maxStartMs, rawEndMs - durationMs)
+          if (minCandidateMs > maxCandidateMs) return
+          for (let startMs = minCandidateMs; startMs <= maxCandidateMs; startMs += stepMs) {
+            pushOption(startMs)
+          }
+        })
+        return result.sort((a, b) => a.value.localeCompare(b.value))
+      },
+      alignToNextHalfHour(value) {
+        const stepMs = 30 * 60 * 1000
+        if (!Number.isFinite(value) || value <= 0) return 0
+        const remainder = value % stepMs
+        return remainder === 0 ? value : value + (stepMs - remainder)
+      },
+      parseDateTime(value) {
+        const time = new Date(String(value || '').replace(/-/g, '/')).getTime()
+        return Number.isFinite(time) ? time : 0
+      },
+      formatClock(date) {
+        const hour = String(date.getHours()).padStart(2, '0')
+        const minute = String(date.getMinutes()).padStart(2, '0')
+        return `${hour}:${minute}`
+      },
+      changeBookingDate(e) {
+        const date = this.bookingDateOptions[Number(e.detail.value || 0)] || ''
+        this.form.date = date
+        const first = this.bookingStartOptions.find(item => item.date === date)
+        this.form.time = first ? first.time : ''
+      },
+      changeBookingTime(e) {
+        this.form.time = this.bookingTimeOptions[Number(e.detail.value || 0)] || ''
       },
       isDishSelected(id) {
         return this.selectedDishIds.indexOf(String(id)) !== -1
@@ -397,15 +560,19 @@
         return `${this.form.date} ${this.form.time}:00`
       },
       validateTime(startText) {
-        const start = new Date(startText.replace(/-/g, '/')).getTime()
-        const now = Date.now()
-        const max = now + 3 * 24 * 60 * 60 * 1000
-        if (!start || start <= now) {
-          this.$modal.msg('上门开始时间必须晚于当前时间')
+        const latestOptions = this.collectBookingStartOptions(this.chef.availableTimes || [])
+        this.bookingStartOptions = latestOptions
+        if (!latestOptions.length) {
+          this.form.date = ''
+          this.form.time = ''
+          this.$modal.msg('当前没有可预约的上门时间')
           return false
         }
-        if (start > max) {
-          this.$modal.msg('最多只能预约未来 3 天内的时间')
+        if (!latestOptions.some(item => item.value === startText)) {
+          const first = latestOptions[0]
+          this.form.date = first.date
+          this.form.time = first.time
+          this.$modal.msg('预约时间已变化，请重新确认上门时间')
           return false
         }
         return true

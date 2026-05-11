@@ -193,6 +193,9 @@
         if (chefStatus.isChefRejected(this.chef) || chefStatus.isChefDisabled(this.chef) || chefStatus.isChefResigned(this.chef)) return 'danger'
         return 'muted'
       },
+      chefRejectReason() {
+        return chefStatus.getChefRejectReason(this.chef)
+      },
       canResign() {
         return this.isChefWorkbenchAvailable
       },
@@ -229,12 +232,15 @@
             tone: 'green'
           },
           {
-            title: '申请成为服务厨师',
-            description: '提交服务厨师资料，申请开通工作台能力',
+            title: chefStatus.isChefRejected(this.chef) ? '完善入驻资料' : '申请成为服务厨师',
+            description: chefStatus.isChefRejected(this.chef)
+              ? (this.chefRejectReason ? `驳回原因：${this.chefRejectReason}` : '入驻申请已驳回，请完善资料后重新提交')
+              : '提交服务厨师资料，申请开通工作台能力',
             url: '/pages/work/profile',
             badge: '申',
             tone: 'red',
             action: 'applyChef',
+            confirmContent: chefStatus.isChefRejected(this.chef) ? '是否前往完善入驻资料?' : '是否申请入驻成为服务厨师?',
             requiresLogin: true
           }
         ]
@@ -384,7 +390,7 @@
         if (item.action === 'applyChef') {
           uni.showModal({
             title: '申请入驻',
-            content: '是否申请入驻成为服务厨师?',
+            content: item.confirmContent || '是否申请入驻成为服务厨师?',
             cancelText: '否',
             confirmText: '是',
             success: (res) => {

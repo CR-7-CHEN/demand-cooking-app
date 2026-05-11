@@ -82,14 +82,7 @@
       },
       // 密码登录
       async pwdLogin() {
-        let loginInfo = {}
-        try {
-          loginInfo = await this.getPasswordLoginInfo()
-        } catch (error) {
-          this.$modal.closeLoading()
-          this.$modal.msgError(error.message || '微信登录凭证获取失败，请重试')
-          return
-        }
+        const loginInfo = await this.getPasswordLoginInfo()
         this.$store.dispatch('Login', {
           ...this.loginForm,
           ...loginInfo
@@ -101,12 +94,12 @@
         })
       },
       getPasswordLoginInfo() {
-        return new Promise((resolve, reject) => {
+        return new Promise((resolve) => {
           // #ifdef MP-WEIXIN
           uni.login({
             success: ({ code }) => {
               if (!code) {
-                reject(new Error('未获取到微信登录凭证，请重试'))
+                resolve({})
                 return
               }
               resolve({
@@ -115,7 +108,7 @@
               })
             },
             fail: () => {
-              reject(new Error('微信登录凭证获取失败，请重试'))
+              resolve({})
             }
           })
           // #endif

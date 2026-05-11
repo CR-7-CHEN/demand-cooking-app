@@ -36,13 +36,13 @@
         <view class="time-grid">
           <view class="field">
             <text class="label">开始</text>
-            <picker mode="time" :value="timeForm.startTime" @change="onStartTimeChange">
+            <picker :range="halfHourOptions" :value="startTimeIndex" @change="onStartTimeChange">
               <view class="input picker">{{ timeForm.startTime || '请选择' }}</view>
             </picker>
           </view>
           <view class="field">
             <text class="label">结束</text>
-            <picker mode="time" :value="timeForm.endTime" @change="onEndTimeChange">
+            <picker :range="halfHourOptions" :value="endTimeIndex" @change="onEndTimeChange">
               <view class="input picker">{{ timeForm.endTime || '请选择' }}</view>
             </picker>
           </view>
@@ -71,6 +71,11 @@
 
   const AVAILABLE_TIME_DRAFT_KEY = 'work_profile_available_time_draft'
   const AVAILABLE_TIME_RESULT_KEY = 'work_profile_available_time_result'
+  const HALF_HOUR_OPTIONS = Array.from({ length: 48 }, (_, index) => {
+    const hour = String(Math.floor(index / 2)).padStart(2, '0')
+    const minute = index % 2 === 0 ? '00' : '30'
+    return `${hour}:${minute}`
+  })
   const MEAL_OPTIONS = ['早餐', '午餐', '晚餐']
 
   export default {
@@ -80,6 +85,7 @@
         focus: '',
         loading: false,
         chefTimes: [],
+        halfHourOptions: HALF_HOUR_OPTIONS,
         mealOptions: MEAL_OPTIONS,
         timeStatusOptions: [
           { label: '启用', value: '0' },
@@ -115,6 +121,14 @@
       },
       mealOptionIndex() {
         const index = this.mealOptions.findIndex(item => item === this.timeForm.remark)
+        return index > -1 ? index : 0
+      },
+      startTimeIndex() {
+        const index = this.halfHourOptions.findIndex(item => item === this.timeForm.startTime)
+        return index > -1 ? index : 0
+      },
+      endTimeIndex() {
+        const index = this.halfHourOptions.findIndex(item => item === this.timeForm.endTime)
         return index > -1 ? index : 0
       }
     },
@@ -197,6 +211,9 @@
         const end = item.endTime || ''
         return `${this.formatDate(start)} ${this.formatTime(start)}-${this.formatTime(end)}`
       },
+      isHalfHourClock(value) {
+        return /^(?:[01]\d|2[0-3]):(?:00|30)$/.test(String(value || ''))
+      },
       timeStatusText(status) {
         return status === '1' ? '停用' : '启用'
       },
@@ -210,10 +227,12 @@
         this.timeForm.date = e.detail.value
       },
       onStartTimeChange(e) {
-        this.timeForm.startTime = e.detail.value
+        const index = Number(e.detail.value || 0)
+        this.timeForm.startTime = this.halfHourOptions[index] || ''
       },
       onEndTimeChange(e) {
-        this.timeForm.endTime = e.detail.value
+        const index = Number(e.detail.value || 0)
+        this.timeForm.endTime = this.halfHourOptions[index] || ''
       },
       onTimeStatusChange(e) {
         const index = Number(e.detail.value || 0)
@@ -260,10 +279,14 @@
         if (!this.timeForm.startTime) return '请选择开始时间'
         if (!this.timeForm.endTime) return '请选择结束时间'
         if (!this.normalizeMealRemark(this.timeForm.remark)) return '请选择三餐'
+        if (!this.isHalfHourClock(this.timeForm.startTime) || !this.isHalfHourClock(this.timeForm.endTime)) {
+          return '璇烽€夋嫨 30 鍒嗛挓绮掑害鐨勫紑濮嬪拰缁撴潫鏃堕棿'
+        }
         const start = new Date(`${this.timeForm.date.replace(/-/g, '/')} ${this.timeForm.startTime}:00`)
         const end = new Date(`${this.timeForm.date.replace(/-/g, '/')} ${this.timeForm.endTime}:00`)
         if (!start.getTime() || !end.getTime()) return '请选择有效时间'
         if (end.getTime() <= start.getTime()) return '结束时间必须晚于开始时间'
+        if (end.getTime() - start.getTime() < 3 * 60 * 60 * 1000) return '单个可预约时间段不能少于 3 小时'
         return ''
       },
       hasTimeFormInput() {

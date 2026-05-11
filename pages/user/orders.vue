@@ -15,7 +15,13 @@
     <view v-else-if="orders.length === 0" class="state">当前没有订单</view>
 
     <view v-else class="list">
-      <view v-for="order in orders" :key="order.id || order.orderNo" class="order-card" @click="openOrder(order)">
+      <view
+        v-for="order in orders"
+        :key="order.orderKey || order.orderNo"
+        class="order-card"
+        :data-order-id="order.orderKey"
+        @tap="openOrder"
+      >
         <view class="order-head">
           <view class="order-no">{{ order.orderNo || '预约订单' }}</view>
           <view class="status">{{ statusText(order.status) }}</view>
@@ -112,12 +118,33 @@
         return res
       },
       normalizeOrder(item) {
+        const orderId = this.resolveOrderId(item)
         return {
           ...item,
-          id: item.id || item.orderId,
+          id: orderId,
+          orderId: item.orderId !== undefined && item.orderId !== null && item.orderId !== '' ? item.orderId : orderId,
+          orderKey: orderId,
           startTime: item.startTime || item.appointmentStartTime || item.serviceStartTime,
           price: item.price || item.totalPrice || item.quoteAmount
         }
+      },
+      resolveOrderId(order) {
+        if (typeof order === 'string' || typeof order === 'number') return String(order)
+        if (order && order.currentTarget && order.currentTarget.dataset) {
+          const datasetId = order.currentTarget.dataset.orderId
+          if (datasetId !== undefined && datasetId !== null && String(datasetId) !== '') {
+            return String(datasetId)
+          }
+        }
+        if (!order) return ''
+        const ids = [order.id, order.orderId]
+        for (let i = 0; i < ids.length; i += 1) {
+          const id = ids[i]
+          if (id !== undefined && id !== null && String(id) !== '') {
+            return String(id)
+          }
+        }
+        return ''
       },
       normalizeStatus(status) {
         return orderStatus.normalizeOrderStatus(status)
@@ -130,11 +157,12 @@
         this.loadOrders()
       },
       openOrder(order) {
-        if (!order.id) {
+        const orderId = this.resolveOrderId(order)
+        if (orderId === '') {
           this.$modal.msg('订单缺少编号，无法查看详情')
           return
         }
-        this.$tab.navigateTo(`/pages/user/order-detail?id=${order.id}`)
+        this.$tab.navigateTo(`/pages/user/order-detail?id=${orderId}`)
       },
       statusText(status) {
         const normalized = orderStatus.normalizeOrderStatus(status)

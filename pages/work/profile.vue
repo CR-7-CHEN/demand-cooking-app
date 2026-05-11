@@ -87,8 +87,17 @@
       </view>
       <view class="field">
         <text class="label">健康证有效期</text>
-        <picker mode="date" :value="form.healthCertificateExpireDate" @change="onDateChange">
-          <view class="input picker">{{ form.healthCertificateExpireDate || '请选择有效期' }}</view>
+        <picker
+          mode="date"
+          :value="form.healthCertificateExpireDate"
+          @click="onHealthCertificatePickerOpen"
+          @change="onDateChange"
+          @cancel="onHealthCertificatePickerCancel"
+        >
+          <view :class="['input', 'picker', 'health-certificate-picker', healthCertificatePickerOpen ? 'top' : 'bottom']" @click="onHealthCertificatePickerOpen">
+            <text>{{ form.healthCertificateExpireDate || '请选择有效期' }}</text>
+            <text class="picker-arrow"></text>
+          </view>
         </picker>
       </view>
       <view class="field">
@@ -165,6 +174,7 @@
         chefTimes: [],
         regionValue: [0, 0, 0],
         regionPickerOpen: false,
+        healthCertificatePickerOpen: false,
         genderOptions: [
           { label: '男', value: '0' },
           { label: '女', value: '1' },
@@ -193,7 +203,7 @@
         return chefStatus.isChefRejected(this.chef)
       },
       rejectReason() {
-        return this.chef.rejectReason || this.chef.auditRejectReason || this.chef.reason || ''
+        return chefStatus.getChefRejectReason(this.chef)
       },
       submitText() {
         if (this.isNew) return '提交入驻申请'
@@ -342,6 +352,7 @@
       fill(data) {
         this.fillingProfile = true
         try {
+          this.healthCertificatePickerOpen = false
           this.form.realName = data.realName || data.name || data.chefName || ''
           this.form.phone = data.phone || data.mobile || ''
           this.form.age = data.age === undefined || data.age === null ? '' : String(data.age)
@@ -366,7 +377,14 @@
         }
       },
       onDateChange(e) {
+        this.healthCertificatePickerOpen = false
         this.form.healthCertificateExpireDate = e.detail.value
+      },
+      onHealthCertificatePickerOpen() {
+        this.healthCertificatePickerOpen = true
+      },
+      onHealthCertificatePickerCancel() {
+        this.healthCertificatePickerOpen = false
       },
       onGenderChange(event) {
         this.form.gender = event.detail.value || ''
@@ -647,9 +665,14 @@
           this.$modal.showToast(message)
           return
         }
-        const action = (this.isNew || this.isRejected) ? applyChef : updateChefMy
+        const payload = this.buildPayload()
+        if (this.isRejected) {
+          payload.auditStatus = '0'
+          payload.auditReason = ''
+        }
+        const action = this.isNew ? applyChef : updateChefMy
         this.submitting = true
-        action(this.buildPayload()).then(() => {
+        action(payload).then(() => {
           this.$modal.msgSuccess(this.submitText + '成功')
           this.profileDirty = false
           this.load({ force: true })
@@ -1014,7 +1037,8 @@
     line-height: 40rpx;
   }
 
-  .add-region {
+  .add-region,
+  .health-certificate-picker {
     color: #2f8f55;
   }
 
@@ -1026,11 +1050,13 @@
     transform: rotate(135deg);
   }
 
-  .add-region.top .picker-arrow {
+  .add-region.top .picker-arrow,
+  .health-certificate-picker.top .picker-arrow {
     transform: rotate(-45deg);
   }
 
-  .add-region.bottom .picker-arrow {
+  .add-region.bottom .picker-arrow,
+  .health-certificate-picker.bottom .picker-arrow {
     transform: rotate(135deg);
   }
 

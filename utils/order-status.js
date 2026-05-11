@@ -79,7 +79,8 @@ const USER_ORDER_STATUS_GROUPS = Object.freeze({
   reserved: [ORDER_STATUS.WAITING_RESPONSE],
   payment: [ORDER_STATUS.WAITING_PAY, ORDER_STATUS.PRICE_OBJECTION],
   serving: [ORDER_STATUS.WAITING_SERVICE, ORDER_STATUS.WAITING_CONFIRM],
-  completed: [ORDER_STATUS.COMPLETED]
+  completed: [ORDER_STATUS.COMPLETED],
+  closed: CLOSED_STATUSES.slice()
 });
 
 function normalizeOrderStatus(status) {
