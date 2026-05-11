@@ -17,11 +17,10 @@
     </view>
 
     <view class="card">
-      <view class="card-title">当前可操作</view>
       <view class="actions">
         <button v-if="canPay" class="primary" @click="pay">模拟支付成功</button>
         <button v-if="canObjection" class="plain" @click="openObjection">发起报价异议</button>
-        <button v-if="canCancel" class="plain danger" @click="cancel">取消订单</button>
+        <button v-if="canCancel" class="plain danger cancel-btn" @click="cancel">取消订单</button>
         <button v-if="canConfirm" class="primary" @click="confirm">确认完成</button>
         <button v-if="canReview" class="plain" @click="openReview">评价</button>
         <button v-if="canComplaint" class="plain" @click="openComplaint">投诉</button>
@@ -384,11 +383,15 @@
 
   .actions button,
   .submit-btn {
-    height: 76rpx;
-    line-height: 76rpx;
-    padding: 0;
+    width: 100%;
+    height: 84rpx;
+    line-height: 84rpx;
+    margin: 0;
+    padding: 0 12rpx;
     border-radius: 8rpx;
-    font-size: 26rpx;
+    font-size: 28rpx;
+    white-space: nowrap;
+    box-sizing: border-box;
   }
 
   .primary,
@@ -405,6 +408,11 @@
   .danger {
     color: #d84a35;
     background: #fff0e8;
+  }
+
+  .cancel-btn {
+    grid-column: 1 / -1;
+    width: 100%;
   }
 
   .textarea {

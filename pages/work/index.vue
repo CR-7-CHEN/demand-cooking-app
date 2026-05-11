@@ -44,7 +44,10 @@
           class="quick-item"
           @click="handleServiceCenterAction(item)"
         >
-          <view class="quick-icon" :class="item.tone">{{ item.badge }}</view>
+          <view class="quick-icon" :class="item.tone">
+            {{ item.badge }}
+            <text v-if="item.reminderCount > 0" class="quick-badge">{{ item.reminderBadgeText }}</text>
+          </view>
           <view class="quick-body">
             <text class="quick-title">{{ item.title }}</text>
             <text class="quick-desc">{{ item.description }}</text>
@@ -128,6 +131,7 @@
 
 <script>
   import { getToken } from '@/utils/auth'
+  import { listMyOrders } from '@/api/cooking/user'
   import {
     getChefMy,
     resignChef,
@@ -136,6 +140,7 @@
   } from '@/api/cooking/chef'
   const chefStatus = require('@/utils/chef-status')
   const orderStatus = require('@/utils/order-status')
+  const userOrderTabs = require('@/utils/user-order-tabs')
   const CHEF_ORDER_GROUP_MAP = {
     [orderStatus.ORDER_STATUS.WAITING_RESPONSE]: 'response',
     [orderStatus.ORDER_STATUS.PRICE_OBJECTION]: 'dispute',
@@ -155,6 +160,7 @@
         chef: {},
         orders: [],
         announcements: [],
+        serviceOrderReminderCount: 0,
         resignReasonInput: '',
         resignSubmitting: false
       }
@@ -199,6 +205,9 @@
       canResign() {
         return this.isChefWorkbenchAvailable
       },
+      serviceOrderReminderBadgeText() {
+        return this.serviceOrderReminderCount > 99 ? '99+' : String(this.serviceOrderReminderCount)
+      },
       serviceCenterActions() {
         return [
           {
@@ -207,6 +216,8 @@
             url: '/pages/user/orders',
             badge: '订',
             tone: 'orange',
+            reminderCount: this.serviceOrderReminderCount,
+            reminderBadgeText: this.serviceOrderReminderBadgeText,
             requiresLogin: true
           },
           {
@@ -288,7 +299,7 @@
           }
           this.orders = []
           this.announcements = []
-          return Promise.resolve()
+          return this.loadServiceCenterReminder()
         }).finally(() => {
           this.loading = false
         })
@@ -317,6 +328,22 @@
           this.orders = this.toList(res)
         }).catch(() => {
           this.orders = []
+        })
+      },
+      loadServiceCenterReminder() {
+        if (!getToken()) {
+          this.serviceOrderReminderCount = 0
+          return Promise.resolve()
+        }
+        return listMyOrders({
+          pageNum: 1,
+          pageSize: 120,
+          statusGroup: 'payment',
+          statuses: userOrderTabs.statusesOfTab('payment')
+        }).then(res => {
+          this.serviceOrderReminderCount = this.toList(res).length
+        }).catch(() => {
+          this.serviceOrderReminderCount = 0
         })
       },
       loadAnnouncements() {
@@ -710,6 +737,7 @@
   }
 
   .quick-icon {
+    position: relative;
     flex: 0 0 auto;
     width: 72rpx;
     height: 72rpx;
@@ -719,6 +747,23 @@
     font-weight: 700;
     line-height: 72rpx;
     text-align: center;
+  }
+
+  .quick-badge {
+    position: absolute;
+    top: -12rpx;
+    right: -16rpx;
+    min-width: 36rpx;
+    height: 36rpx;
+    padding: 0 10rpx;
+    box-sizing: border-box;
+    line-height: 36rpx;
+    border-radius: 999rpx;
+    background: #e85d34;
+    color: #fff;
+    font-size: 20rpx;
+    text-align: center;
+    font-weight: 600;
   }
 
   .quick-icon.dark {

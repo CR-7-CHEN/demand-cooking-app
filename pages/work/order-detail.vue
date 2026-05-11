@@ -53,13 +53,10 @@
         <text class="field-label">报价说明</text>
         <textarea class="textarea" v-model.trim="quoteForm.quoteRemark" placeholder="说明服务内容、菜品复杂度或调整原因" />
       </view>
-      <button class="primary-btn" :loading="submitting" @click="submitQuote">{{ canHandleDispute ? '提交修改报价' : '同意并报价' }}</button>
-    </view>
-
-    <view v-if="canReject" class="action-card">
-      <view class="section-title">拒绝预约</view>
-      <textarea class="textarea" v-model.trim="rejectReason" placeholder="可填写拒绝原因，便于平台和用户理解" />
-      <button class="plain-danger" :loading="submitting" @click="submitReject">拒绝预约</button>
+      <view class="quote-actions">
+        <button class="primary-btn quote-actions__primary" :loading="submitting" @click="submitQuote">{{ canHandleDispute ? '提交修改报价' : '同意并报价' }}</button>
+        <button v-if="canReject" class="plain-danger quote-actions__reject" :loading="submitting" @click="openRejectReservationPopup">拒绝预约</button>
+      </view>
     </view>
 
     <view v-if="canComplete || canChefCancel" class="action-card">
@@ -82,6 +79,24 @@
         <view class="reject-service-dialog__actions">
           <button class="reject-service-dialog__btn reject-service-dialog__btn--ghost" :disabled="submitting" @click="closeRejectServicePopup">取消</button>
           <button class="reject-service-dialog__btn reject-service-dialog__btn--danger" :loading="submitting" @click="submitRejectService">确定</button>
+        </view>
+      </view>
+    </uni-popup>
+
+    <uni-popup ref="rejectReservationPopup" type="dialog" :is-mask-click="!submitting" @change="onRejectReservationPopupChange">
+      <view class="reject-reservation-dialog">
+        <view class="reject-reservation-dialog__title">拒绝预约</view>
+        <view class="reject-reservation-dialog__desc">确定拒绝该预约吗?</view>
+        <textarea
+          v-model.trim="rejectReservationReasonInput"
+          class="reject-reservation-dialog__input"
+          placeholder="请填写拒绝原因"
+          placeholder-class="reject-reservation-dialog__placeholder"
+          maxlength="500"
+        />
+        <view class="reject-reservation-dialog__actions">
+          <button class="reject-reservation-dialog__btn reject-reservation-dialog__btn--ghost" :disabled="submitting" @click="closeRejectReservationPopup">否</button>
+          <button class="reject-reservation-dialog__btn reject-reservation-dialog__btn--danger" :loading="submitting" @click="submitRejectReservation">是</button>
         </view>
       </view>
     </uni-popup>
@@ -123,7 +138,7 @@
         orderId: '',
         order: {},
         submitting: false,
-        rejectReason: '',
+        rejectReservationReasonInput: '',
         rejectServiceReasonInput: '',
         quoteForm: {
           serviceTotalPrice: '',
@@ -238,10 +253,35 @@
         })
       },
       submitReject() {
+        return this.submitRejectReservation()
+      },
+      openRejectReservationPopup() {
+        if (this.submitting || !this.$refs.rejectReservationPopup) return
+        this.$refs.rejectReservationPopup.open()
+      },
+      onRejectReservationPopupChange(event) {
+        if (event && event.show) return
+        this.rejectReservationReasonInput = ''
+      },
+      closeRejectReservationPopup() {
+        if (this.submitting || !this.$refs.rejectReservationPopup) return
+        this.$refs.rejectReservationPopup.close()
+      },
+      submitRejectReservation() {
+        if (!this.rejectReservationReasonInput) {
+          this.$modal.showToast('请填写拒绝原因')
+          return
+        }
         this.$modal.confirm('确认拒绝该预约吗？拒绝后会释放时间锁定。').then(() => {
           this.submitting = true
-          rejectChefOrder(this.orderPayload({ reason: this.rejectReason, rejectReason: this.rejectReason })).then(() => {
+          rejectChefOrder(this.orderPayload({
+            reason: this.rejectReservationReasonInput,
+            rejectReason: this.rejectReservationReasonInput
+          })).then(() => {
             this.$modal.msgSuccess('已拒绝预约')
+            if (this.$refs.rejectReservationPopup) {
+              this.$refs.rejectReservationPopup.close()
+            }
             uni.navigateBack()
           }).finally(() => {
             this.submitting = false
@@ -488,6 +528,19 @@
     color: #fff;
   }
 
+  .quote-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 16rpx;
+    margin-top: 18rpx;
+  }
+
+  .quote-actions__primary,
+  .quote-actions__reject {
+    width: 100%;
+    margin-top: 0;
+  }
+
   .plain-danger {
     margin-top: 18rpx;
     background: #fff4f2;
@@ -518,6 +571,14 @@
     box-sizing: border-box;
   }
 
+  .reject-reservation-dialog {
+    width: 620rpx;
+    padding: 36rpx 32rpx 28rpx;
+    border-radius: 16rpx;
+    background: #fff;
+    box-sizing: border-box;
+  }
+
   .reject-service-dialog__title {
     color: #17211b;
     font-size: 36rpx;
@@ -525,7 +586,22 @@
     text-align: center;
   }
 
+  .reject-reservation-dialog__title {
+    color: #17211b;
+    font-size: 36rpx;
+    font-weight: 700;
+    text-align: center;
+  }
+
   .reject-service-dialog__desc {
+    margin-top: 18rpx;
+    color: #66756b;
+    font-size: 28rpx;
+    line-height: 1.6;
+    text-align: center;
+  }
+
+  .reject-reservation-dialog__desc {
     margin-top: 18rpx;
     color: #66756b;
     font-size: 28rpx;
@@ -547,12 +623,38 @@
     background: #fbfcfb;
   }
 
+  .reject-reservation-dialog__input {
+    width: 100%;
+    min-height: 180rpx;
+    margin-top: 22rpx;
+    padding: 18rpx 20rpx;
+    border: 1rpx solid #e2e8e4;
+    border-radius: 8rpx;
+    box-sizing: border-box;
+    color: #17211b;
+    font-size: 24rpx;
+    line-height: 1.6;
+    background: #fbfcfb;
+  }
+
   .reject-service-dialog__placeholder {
     color: #98a29b;
     font-size: 22rpx;
   }
 
+  .reject-reservation-dialog__placeholder {
+    color: #98a29b;
+    font-size: 22rpx;
+  }
+
   .reject-service-dialog__actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18rpx;
+    margin-top: 26rpx;
+  }
+
+  .reject-reservation-dialog__actions {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 18rpx;
@@ -566,13 +668,31 @@
     font-size: 28rpx;
   }
 
+  .reject-reservation-dialog__btn {
+    height: 76rpx;
+    line-height: 76rpx;
+    border-radius: 8rpx;
+    font-size: 28rpx;
+  }
+
   .reject-service-dialog__btn--ghost {
     background: #fff;
     color: #5f6d64;
     border: 1rpx solid #d7dfda;
   }
 
+  .reject-reservation-dialog__btn--ghost {
+    background: #fff;
+    color: #5f6d64;
+    border: 1rpx solid #d7dfda;
+  }
+
   .reject-service-dialog__btn--danger {
+    background: #a82819;
+    color: #fff;
+  }
+
+  .reject-reservation-dialog__btn--danger {
     background: #a82819;
     color: #fff;
   }

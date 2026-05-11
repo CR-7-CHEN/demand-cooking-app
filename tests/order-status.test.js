@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 
 const {
   ORDER_STATUS,
+  CLOSED_STATUSES,
   displayOrderStatusText,
   normalizeOrderStatus,
   orderStatusGroup,
@@ -32,7 +33,7 @@ test('groups numeric order statuses by user order lifecycle', () => {
   assert.equal(orderStatusGroup(0), 'reserved');
   assert.equal(orderStatusGroup(1), 'payment');
   assert.equal(orderStatusGroup(2), 'payment');
-  assert.equal(orderStatusGroup(3), 'serving');
+  assert.equal(orderStatusGroup(3), 'paid');
   assert.equal(orderStatusGroup(4), 'serving');
   assert.equal(orderStatusGroup(5), 'completed');
 });
@@ -73,13 +74,15 @@ test('maps closed and unknown statuses away from active or completed groups', ()
 test('exposes numeric user tab status groups from the shared status utility', () => {
   assert.deepEqual(statusesOfUserTab('reserved'), [0]);
   assert.deepEqual(statusesOfUserTab('payment'), [1, 2]);
+  assert.deepEqual(statusesOfUserTab('paid'), [3]);
   assert.deepEqual(statusesOfUserTab('serving'), [3, 4]);
   assert.deepEqual(statusesOfUserTab('completed'), [5]);
-  assert.deepEqual(statusesOfUserTab('closed'), []);
+  assert.deepEqual(statusesOfUserTab('closed'), CLOSED_STATUSES);
   assert.equal(tabOfUserStatus(0), 'reserved');
+  assert.equal(tabOfUserStatus(3), 'paid');
   assert.equal(tabOfUserStatus('WAITING_CONFIRM'), 'serving');
   assert.equal(tabOfUserStatus('COMPLETED'), 'completed');
-  assert.equal(tabOfUserStatus('CANCELED'), '');
+  assert.equal(tabOfUserStatus('CANCELED'), 'closed');
 });
 
 test('maps backend english status enums to readable Chinese copy', () => {

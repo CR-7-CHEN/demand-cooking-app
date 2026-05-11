@@ -13,8 +13,10 @@ function loadComponentOptions(uniOverrides = {}) {
 
   const script = match[1]
     .replace(/import\s+\{\s*getToken\s*\}\s+from\s+'@\/utils\/auth'\s*/, "const getToken = () => 'token'\n")
+    .replace(/import\s+\{\s*listMyOrders\s*\}\s+from\s+'@\/api\/cooking\/user'\s*/, "const listMyOrders = globalThis.__testApi.listMyOrders\n")
     .replace(/import\s+\{[\s\S]*?getWorkbenchAnnouncements[\s\S]*?\}\s+from\s+'@\/api\/cooking\/chef'/, "const getChefMy = () => Promise.resolve({})\nconst resignChef = () => Promise.resolve({})\nconst getChefOrderList = () => Promise.resolve({})\nconst getWorkbenchAnnouncements = () => Promise.resolve({})\n")
     .replace(/const chefStatus = require\('@\/utils\/chef-status'\)/, `const chefStatus = require(${JSON.stringify(path.join(__dirname, '..', 'utils', 'chef-status.js'))})`)
+    .replace(/const userOrderTabs = require\('@\/utils\/user-order-tabs'\)/, `const userOrderTabs = require(${JSON.stringify(path.join(__dirname, '..', 'utils', 'user-order-tabs.js'))})`)
     .replace(/const orderStatus = require\('@\/utils\/order-status'\)/, "const orderStatus = { ORDER_STATUS: { WAITING_RESPONSE: '0', PRICE_OBJECTION: '2', WAITING_SERVICE: '3', WAITING_CONFIRM: '4', COMPLETED: '5' }, normalizeOrderStatus: value => String(value || ''), isCompletedOrder: value => String(value || '') === '5' }\n")
     .replace(/export default/, 'module.exports =')
 
@@ -24,6 +26,11 @@ function loadComponentOptions(uniOverrides = {}) {
     require,
     console,
     Promise,
+    globalThis: {
+      __testApi: {
+        listMyOrders: () => Promise.resolve({ data: { rows: [] } })
+      }
+    },
     uni: {
       showToast() {},
       showModal() {},
@@ -59,12 +66,14 @@ function createPageContext(component, overrides = {}) {
   }
   Object.assign(ctx, component.methods)
   Object.assign(ctx, overrides)
-  Object.defineProperty(ctx, 'isChefWorkbenchAvailable', {
-    configurable: true,
-    enumerable: true,
-    get() {
-      return component.computed.isChefWorkbenchAvailable.call(ctx)
-    }
+  Object.entries(component.computed || {}).forEach(([name, getter]) => {
+    Object.defineProperty(ctx, name, {
+      configurable: true,
+      enumerable: true,
+      get() {
+        return getter.call(ctx)
+      }
+    })
   })
   return ctx
 }
@@ -175,4 +184,32 @@ test('work tab protected service-center actions reuse login gating', () => {
   component.methods.handleServiceCenterAction.call(ctx, orderEntry)
 
   assert.deepEqual(calls, ['/pages/user/orders'])
+})
+
+test('work tab service center mirrors pending payment count onto the my-orders reminder badge', async () => {
+  assert.match(source, /class="quick-badge"/)
+
+  const component = loadComponentOptions()
+  let reminderLoads = 0
+  const ctx = createPageContext(component, {
+    loadChef() {
+      this.chef = {}
+      return Promise.resolve()
+    },
+    loadServiceCenterReminder() {
+      reminderLoads += 1
+      this.serviceOrderReminderCount = 6
+      return Promise.resolve()
+    }
+  })
+
+  await component.methods.loadPage.call(ctx)
+
+  const serviceCenterActions = component.computed.serviceCenterActions.call(ctx)
+  const orderEntry = serviceCenterActions.find(item => item.url === '/pages/user/orders')
+
+  assert.equal(reminderLoads, 1)
+  assert.ok(orderEntry, 'expected my orders entry to exist')
+  assert.equal(orderEntry.reminderCount, 6)
+  assert.equal(orderEntry.reminderBadgeText, '6')
 })

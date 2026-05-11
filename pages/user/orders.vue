@@ -7,7 +7,10 @@
         :class="['tab', activeStatus === item.value ? 'active' : '']"
         @click="changeStatus(item.value)"
       >
-        {{ item.label }}
+        <view class="tab-content">
+          <text class="tab-text">{{ item.label }}</text>
+          <text v-if="showTabCount(item)" class="tab-badge">{{ formatTabCount(tabCountOf(item.value)) }}</text>
+        </view>
       </view>
     </scroll-view>
 
@@ -54,7 +57,8 @@
         activeStatus: orderTabs.USER_ORDER_TABS[0].value,
         tabs: orderTabs.USER_ORDER_TABS,
         chefProfile: {},
-        orders: []
+        orders: [],
+        paymentTabCount: 0
       }
     },
     onShow() {
@@ -89,13 +93,26 @@
       },
       loadOrders() {
         this.loading = true
-        return listMyOrders({
+        const currentQuery = {
           statusGroup: this.activeStatus,
           statuses: orderTabs.statusesOfTab(this.activeStatus)
-        }).then(res => {
-          this.orders = this.pickList(res).map(this.normalizeOrder)
+        }
+        const paymentQuery = {
+          statusGroup: 'payment',
+          statuses: orderTabs.statusesOfTab('payment')
+        }
+        return Promise.all([
+          listMyOrders(currentQuery),
+          this.activeStatus === 'payment' ? Promise.resolve(null) : listMyOrders(paymentQuery)
+        ]).then(([currentRes, paymentRes]) => {
+          this.orders = this.pickList(currentRes).map(item => this.normalizeOrder(item))
+          const paymentList = this.activeStatus === 'payment'
+            ? this.orders
+            : this.pickList(paymentRes).map(item => this.normalizeOrder(item))
+          this.paymentTabCount = paymentList.length
         }).catch(() => {
           this.orders = []
+          this.paymentTabCount = 0
         }).finally(() => {
           this.loading = false
         })
@@ -155,6 +172,20 @@
       changeStatus(status) {
         this.activeStatus = status
         this.loadOrders()
+      },
+      tabCountOf(tabValue) {
+        if (tabValue === 'payment') {
+          return this.paymentTabCount
+        }
+        return 0
+      },
+      showTabCount(tab) {
+        return !!tab && tab.value === 'payment'
+      },
+      formatTabCount(count) {
+        const value = Number(count)
+        if (!Number.isFinite(value) || value < 0) return '0'
+        return value > 99 ? '99+' : String(value)
       },
       openOrder(order) {
         const orderId = this.resolveOrderId(order)
@@ -229,6 +260,30 @@
     color: #69736e;
     background: #fff;
     font-size: 25rpx;
+  }
+
+  .tab-content {
+    display: flex;
+    align-items: center;
+    gap: 10rpx;
+  }
+
+  .tab-text {
+    white-space: nowrap;
+  }
+
+  .tab-badge {
+    min-width: 36rpx;
+    height: 36rpx;
+    padding: 0 10rpx;
+    box-sizing: border-box;
+    line-height: 36rpx;
+    border-radius: 999rpx;
+    background: #e85d34;
+    color: #fff;
+    font-size: 20rpx;
+    text-align: center;
+    font-weight: 600;
   }
 
   .tab.active {

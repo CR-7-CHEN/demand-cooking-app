@@ -78,6 +78,7 @@ const DEFAULT_STATUS_TEXT_MAP = Object.freeze({
 const USER_ORDER_STATUS_GROUPS = Object.freeze({
   reserved: [ORDER_STATUS.WAITING_RESPONSE],
   payment: [ORDER_STATUS.WAITING_PAY, ORDER_STATUS.PRICE_OBJECTION],
+  paid: [ORDER_STATUS.WAITING_SERVICE],
   serving: [ORDER_STATUS.WAITING_SERVICE, ORDER_STATUS.WAITING_CONFIRM],
   completed: [ORDER_STATUS.COMPLETED],
   closed: CLOSED_STATUSES.slice()
@@ -120,7 +121,10 @@ function orderStatusGroup(status) {
   if (normalized === ORDER_STATUS.WAITING_PAY || normalized === ORDER_STATUS.PRICE_OBJECTION) {
     return 'payment';
   }
-  if (normalized === ORDER_STATUS.WAITING_SERVICE || normalized === ORDER_STATUS.WAITING_CONFIRM) {
+  if (normalized === ORDER_STATUS.WAITING_SERVICE) {
+    return 'paid';
+  }
+  if (normalized === ORDER_STATUS.WAITING_CONFIRM) {
     return 'serving';
   }
   if (normalized === ORDER_STATUS.COMPLETED) {

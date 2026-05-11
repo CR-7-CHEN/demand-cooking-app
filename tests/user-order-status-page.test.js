@@ -240,6 +240,49 @@ test('status text keeps English closed-status labels after numeric normalization
   assert.match(detailSource, /map\[normalized\]\s*\|\|\s*map\[rawStatus\]/);
 });
 
+test('ordinary user orders show the payment-tab badge and refresh its count separately', async () => {
+  assert.match(ordersSource, /class="tab-badge"/);
+
+  const calls = [];
+  const component = loadOrdersComponent({
+    listMyOrders: params => {
+      calls.push(params.statusGroup);
+      if (params.statusGroup === 'payment') {
+        return Promise.resolve({
+          data: {
+            rows: [
+              { orderId: 'PAY-1', status: 'WAITING_PAY' },
+              { orderId: 'PAY-2', status: 'PRICE_OBJECTION' }
+            ]
+          }
+        });
+      }
+      return Promise.resolve({
+        data: {
+          rows: [
+            { orderId: 'RES-1', status: 'WAITING_RESPONSE' }
+          ]
+        }
+      });
+    }
+  });
+  const ctx = createOrdersContext(component, {
+    activeStatus: 'reserved'
+  });
+
+  await component.methods.loadOrders.call(ctx);
+
+  const paymentTab = ctx.tabs.find(tab => tab.value === 'payment');
+  const reservedTab = ctx.tabs.find(tab => tab.value === 'reserved');
+
+  assert.deepEqual(calls, ['reserved', 'payment']);
+  assert.equal(ctx.paymentTabCount, 2);
+  assert.equal(component.methods.tabCountOf.call(ctx, 'payment'), 2);
+  assert.equal(component.methods.showTabCount.call(ctx, paymentTab), true);
+  assert.equal(component.methods.showTabCount.call(ctx, reservedTab), false);
+  assert.equal(component.methods.formatTabCount.call(ctx, 2), '2');
+});
+
 test('ordinary user orders open detail even when backend only returns orderId', async () => {
   const component = loadOrdersComponent({
     listMyOrders: () => Promise.resolve({
