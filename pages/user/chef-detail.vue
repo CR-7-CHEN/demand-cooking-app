@@ -20,6 +20,28 @@
       <view class="desc">{{ chef.description || '这位服务厨师还没有填写详细介绍，可以先根据评分、菜系和服务区域判断是否适合。' }}</view>
     </view>
 
+    <view v-if="chef.workImages && chef.workImages.length" class="card">
+      <view class="card-title">作品展示</view>
+      <view class="work-gallery">
+        <image
+          v-for="(img, idx) in chef.workImages"
+          :key="idx"
+          class="work-img"
+          :src="img"
+          mode="aspectFill"
+          @click="previewWorkImage(idx)"
+        ></image>
+      </view>
+    </view>
+
+    <view v-if="chef.healthCertExpireText" class="card">
+      <view class="card-title">资质信息</view>
+      <view class="info-row">
+        <text class="info-label">健康证到期</text>
+        <text :class="['info-value', chef.healthCertExpired ? 'info-value--warn' : '']">{{ chef.healthCertExpireText }}</text>
+      </view>
+    </view>
+
     <view class="card">
       <view class="card-title">预约参考</view>
       <view class="info-row info-row--link" @click="openAvailableTimePopup">
@@ -68,32 +90,38 @@
           <view class="picker-value">{{ form.time || '选择可预约开始时间' }}</view>
         </picker>
       </view>
-      <view class="hint">系统会从上门开始时间起锁定 3 小时，食材默认由用户自备。</view>
     </view>
 
     <view class="card">
-      <view class="card-title">菜品需求</view>
-      <view v-if="dishes.length" class="dish-list">
-        <view
-          v-for="dish in dishes"
-          :key="dish.id"
-          class="dish-item"
-          :class="{ 'is-selected': isDishSelected(dish.id) }"
-          @tap="toggleDishSelection(dish)"
-        >
-          <checkbox
-            :value="String(dish.id)"
-            :checked="isDishSelected(dish.id)"
-            color="#f06a3a"
-            @tap.stop="toggleDishSelection(dish)"
-          />
-          <view>
-            <view class="dish-name">{{ dish.name }}</view>
-            <view class="dish-meta">{{ dish.category }} {{ dish.cuisine }}</view>
-          </view>
+      <view class="card-head card-head--toggle" hover-class="card-head--hover" :hover-stay-time="150" @click="dishExpanded = !dishExpanded">
+        <view class="card-title">菜品需求</view>
+        <view class="toggle-arrow">
+          <uni-icons :type="dishExpanded ? 'up' : 'down'" size="18" color="#9aa19c"></uni-icons>
         </view>
       </view>
-      <view v-else class="empty">暂无菜品库，可填写自定义菜名。</view>
+      <view v-show="dishExpanded">
+        <view v-if="dishes.length" class="dish-list">
+          <view
+            v-for="dish in dishes"
+            :key="dish.id"
+            class="dish-item"
+            :class="{ 'is-selected': isDishSelected(dish.id) }"
+            @tap="toggleDishSelection(dish)"
+          >
+            <checkbox
+              :value="String(dish.id)"
+              :checked="isDishSelected(dish.id)"
+              color="#f06a3a"
+              @tap.stop="toggleDishSelection(dish)"
+            />
+            <view>
+              <view class="dish-name">{{ dish.name }}</view>
+              <view class="dish-meta">{{ dish.category }} {{ dish.cuisine }}</view>
+            </view>
+          </view>
+        </view>
+        <view v-else class="empty">暂无菜品库，可填写自定义菜名。</view>
+      </view>
 
       <textarea v-model="form.customDish" class="textarea" placeholder="自定义菜名，如番茄牛腩、清炒时蔬"></textarea>
       <textarea v-model="form.tasteRemark" class="textarea" placeholder="口味备注，如少辣、不放香菜"></textarea>
@@ -148,7 +176,8 @@
           tasteRemark: '',
           materialRemark: ''
         },
-        submitting: false
+        submitting: false,
+        dishExpanded: false
       }
     },
     computed: {
@@ -244,6 +273,9 @@
           serviceAreaText: areas.length ? areas.join('、') : '',
           recommended: item.recommended || item.recommendFlag || item.isRecommended,
           description: item.intro || item.description || item.introduction || item.profile || item.remark || '',
+          workImages: this.parseWorkImages(item),
+          healthCertExpireText: this.formatHealthCertExpire(item),
+          healthCertExpired: this.isHealthCertExpired(item),
           availableTimes,
           availableTimeText: this.formatAvailableTime(item),
           priceEstimateText: this.formatPriceEstimate(item)
@@ -270,6 +302,41 @@
           endTime: this.firstValue(item, ['endTime', 'serviceEndTime', 'availableEndTime', 'workEndTime']),
           status: String(this.firstValue(item, ['status']) || '0')
         }
+      },
+      parseWorkImages(item) {
+        const raw = item.workImageUrls || item.workImages || item.portfolioImages || ''
+        if (Array.isArray(raw)) return raw.filter(Boolean)
+        const text = String(raw).trim()
+        if (!text) return []
+        try {
+          const parsed = JSON.parse(text)
+          if (Array.isArray(parsed)) return parsed.filter(Boolean)
+        } catch (e) {}
+        return text.split(/[,;，；\s]+/).filter(Boolean)
+      },
+      formatHealthCertExpire(item) {
+        const raw = item.healthCertExpireDate || item.healthCertExpire || ''
+        if (!raw) return ''
+        const text = String(raw).trim()
+        if (!text) return ''
+        const date = new Date(text.replace(/-/g, '/'))
+        if (Number.isNaN(date.getTime())) return text.slice(0, 10)
+        const month = String(date.getMonth() + 1).padStart(2, '0')
+        const day = String(date.getDate()).padStart(2, '0')
+        return `${date.getFullYear()}-${month}-${day}`
+      },
+      isHealthCertExpired(item) {
+        const raw = item.healthCertExpireDate || item.healthCertExpire || ''
+        if (!raw) return false
+        const date = new Date(String(raw).trim().replace(/-/g, '/'))
+        if (Number.isNaN(date.getTime())) return false
+        return date.getTime() < Date.now()
+      },
+      previewWorkImage(index) {
+        uni.previewImage({
+          current: index,
+          urls: this.chef.workImages || []
+        })
       },
       formatAvailableTime(item) {
         const directText = this.firstValue(item, [
@@ -739,6 +806,40 @@
   .card {
     margin-top: 20rpx;
     padding: 28rpx;
+  }
+
+  .work-gallery {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12rpx;
+    margin-top: 18rpx;
+  }
+
+  .work-img {
+    width: 210rpx;
+    height: 210rpx;
+    border-radius: 8rpx;
+    background: #f0f2ef;
+  }
+
+  .info-value--warn {
+    color: #d84a35 !important;
+  }
+
+  .card-head--toggle {
+    padding: 0;
+  }
+
+  .card-head--hover {
+    opacity: 0.6;
+  }
+
+  .toggle-arrow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 48rpx;
+    height: 48rpx;
   }
 
   .card-title {

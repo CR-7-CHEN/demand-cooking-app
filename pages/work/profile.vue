@@ -35,8 +35,9 @@
         <text class="label">头像</text>
         <view class="upload-row">
           <view class="avatar-uploader" @click="chooseAvatar">
-            <image v-if="form.avatarUrl" class="avatar-preview" :src="form.avatarUrl" mode="aspectFill" @click.stop="openImagePreview(form.avatarUrl)"></image>
-            <view v-if="form.avatarUrl" class="image-remove" @click.stop="removeAvatar">×</view>
+            <image v-if="form.avatarUrl" class="avatar-preview" :src="form.avatarUrl" mode="aspectFill"></image>
+            <view v-if="form.avatarUrl" class="image-tap-layer" @tap.stop="openImagePreview(form.avatarUrl)"></view>
+            <view v-if="form.avatarUrl" class="image-remove" @tap.stop="removeAvatar">×</view>
             <view v-else class="upload-placeholder">
               <text class="upload-plus">+</text>
               <text>上传头像</text>
@@ -49,8 +50,9 @@
         <text class="label">作品图</text>
         <view class="image-grid">
           <view v-for="(item, index) in workImageList" :key="item + index" class="work-image">
-            <image :src="item" mode="aspectFill" @click="openImagePreview(item)"></image>
-            <view class="image-remove" @click.stop="removeWorkImage(index)">×</view>
+            <image :src="item" mode="aspectFill"></image>
+            <view class="image-tap-layer" @tap.stop="previewWorkImage(index)"></view>
+            <view class="image-remove" @tap.stop="removeWorkImage(index)">×</view>
           </view>
           <view v-if="canAddWorkImage" class="image-add" @click="chooseWorkImages">
             <text class="upload-plus">+</text>
@@ -104,8 +106,9 @@
         <text class="label">健康证图片</text>
         <view class="image-grid">
           <view v-if="form.healthCertificateImageUrl" class="work-image">
-            <image :src="form.healthCertificateImageUrl" mode="aspectFill" @click="openImagePreview(form.healthCertificateImageUrl)"></image>
-            <view class="image-remove" @click.stop="removeHealthCertificateImage">×</view>
+            <image :src="form.healthCertificateImageUrl" mode="aspectFill"></image>
+            <view class="image-tap-layer" @tap.stop="openImagePreview(form.healthCertificateImageUrl)"></view>
+            <view class="image-remove" @tap.stop="removeHealthCertificateImage">×</view>
           </view>
           <view v-else class="image-add" @click="chooseHealthCertificateImage">
             <text class="upload-plus">+</text>
@@ -148,6 +151,7 @@
     uploadChefImage,
     getChefTime
   } from '@/api/cooking/chef'
+  import appConfig from '@/config'
   import regionData from '@/utils/region-data'
   const chefStatus = require('@/utils/chef-status')
   const AVAILABLE_TIME_DRAFT_KEY = 'work_profile_available_time_draft'
@@ -616,9 +620,33 @@
       syncWorkImageUrls() {
         this.form.workImageUrls = this.workImageList.join(',')
       },
-      openImagePreview(url) {
+      resolveFullUrl(path) {
+        if (!path) return ''
+        if (/^https?:\/\//.test(path)) return path
+        return (appConfig.baseUrl || '') + path
+      },
+      previewWorkImage(index) {
+        const url = this.workImageList[index]
         if (!url) return
-        this.previewImageUrl = url
+        const urls = this.workImageList.filter(Boolean).map(item => this.resolveFullUrl(item))
+        uni.previewImage({
+          current: this.resolveFullUrl(url),
+          urls: urls
+        })
+      },
+      openImagePreview(url, urls = []) {
+        if (!url) return
+        const rawUrls = Array.isArray(urls) && urls.length ? urls.filter(Boolean) : [url]
+        const previewUrls = rawUrls.map(item => this.resolveFullUrl(item))
+        const current = this.resolveFullUrl(url)
+        if (uni.previewImage) {
+          uni.previewImage({
+            current,
+            urls: previewUrls
+          })
+          return
+        }
+        this.previewImageUrl = current
         this.imagePreviewVisible = true
       },
       closeImagePreview() {
@@ -660,6 +688,10 @@
         return ''
       },
       submit() {
+        if (chefStatus.isChefPending(this.chef)) {
+          this.$modal.showToast('当前入驻申请正在审核中，请勿重复提交')
+          return
+        }
         const message = this.validate()
         if (message) {
           this.$modal.showToast(message)
@@ -675,7 +707,7 @@
         action(payload).then(() => {
           this.$modal.msgSuccess(this.submitText + '成功')
           this.profileDirty = false
-          this.load({ force: true })
+          this.$tab.switchTab('/pages/mine/index')
         }).finally(() => {
           this.submitting = false
         })
@@ -956,7 +988,17 @@
     gap: 16rpx;
   }
 
+  .image-tap-layer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 1;
+  }
+
   .image-remove {
+    z-index: 2;
     position: absolute;
     top: 0;
     right: 0;

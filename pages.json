@@ -54,7 +54,7 @@
   }, {
     "path": "pages/work/orders",
     "style": {
-      "navigationBarTitleText": "接单报价"
+      "navigationBarTitleText": "我的订单"
     }
   }, {
     "path": "pages/work/order-detail",

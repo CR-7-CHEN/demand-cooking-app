@@ -7,10 +7,10 @@
       </view>
       <view class="month-action">
         <picker mode="date" fields="month" :value="pickerValue" @change="onMonthChange">
-          <view class="month-btn">{{ monthButtonText }}</view>
+          <view class="month-btn" hover-class="month-btn-hover" :hover-stay-time="150">{{ monthButtonText }}</view>
         </picker>
-        <view v-if="queryMonth" class="month-clear" @tap.stop="clearMonthFilter">
-          <uni-icons type="clear" size="16" color="rgba(255,255,255,0.7)"></uni-icons>
+        <view v-if="queryMonth" class="month-reset" hover-class="month-reset-hover" :hover-stay-time="150" @tap.stop="clearMonthFilter">
+          <text>重置</text>
         </view>
       </view>
     </view>
@@ -466,19 +466,35 @@
   }
 
   .month-btn {
-    padding: 12rpx 18rpx;
+    padding: 12rpx 24rpx;
     border-radius: 999rpx;
     background: rgba(255, 255, 255, 0.14);
     color: #fff;
     font-size: 24rpx;
+    transition: opacity 0.15s;
+
   }
 
-  .month-clear {
+  .month-btn-hover {
+    opacity: 0.6;
+    background: rgba(255, 255, 255, 0.24);
+  }
+
+  .month-reset {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 40rpx;
-    height: 40rpx;
+    padding: 12rpx 20rpx;
+    border-radius: 999rpx;
+    border: 1rpx solid rgba(255, 255, 255, 0.35);
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 22rpx;
+    transition: opacity 0.15s;
+  }
+
+  .month-reset-hover {
+    opacity: 0.6;
+    background: rgba(255, 255, 255, 0.12);
   }
 
   .list-scroll {

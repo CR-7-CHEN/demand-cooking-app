@@ -174,6 +174,32 @@ test('work tab service center apply action confirms before opening the chef prof
   assert.deepEqual(calls, ['/pages/work/profile'])
 })
 
+test('work tab service center shows progress instead of apply when chef entry is pending', () => {
+  const modalCalls = []
+  const component = loadComponentOptions({
+    showModal(options) {
+      modalCalls.push(options)
+    }
+  })
+  const ctx = createPageContext(component, {
+    chef: { chefId: '1', auditStatus: '0', chefStatus: '0' }
+  })
+
+  const serviceCenterActions = component.computed.serviceCenterActions.call(ctx)
+  const pendingEntry = serviceCenterActions.find(item => item.url === '/pages/work/profile')
+
+  assert.ok(pendingEntry, 'expected chef profile entry to exist')
+  assert.equal(pendingEntry.title, '查看申请进度')
+  assert.match(pendingEntry.description, /审核/)
+  assert.equal(pendingEntry.confirmContent, '当前入驻申请正在审核中，是否前往查看已提交资料?')
+
+  component.methods.handleServiceCenterAction.call(ctx, pendingEntry)
+
+  assert.equal(modalCalls.length, 1)
+  assert.equal(modalCalls[0].title, '查看申请进度')
+  assert.equal(modalCalls[0].content, '当前入驻申请正在审核中，是否前往查看已提交资料?')
+})
+
 test('work tab protected service-center actions reuse login gating', () => {
   const component = loadComponentOptions()
   const calls = []
