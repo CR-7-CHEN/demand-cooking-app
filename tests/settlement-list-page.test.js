@@ -7,7 +7,7 @@ const vm = require('node:vm')
 const pagePath = path.join(__dirname, '..', 'pages', 'work', 'settlement.vue')
 const source = fs.readFileSync(pagePath, 'utf8')
 
-function loadComponentOptions() {
+function loadComponentOptions(uniOverrides) {
   const match = source.match(/<script>([\s\S]*?)<\/script>/)
   assert.ok(match, 'expected settlement page to contain a script block')
 
@@ -26,10 +26,10 @@ function loadComponentOptions() {
     Promise,
     setTimeout,
     clearTimeout,
-    uni: {
+    uni: Object.assign({
       navigateTo() {},
       stopPullDownRefresh() {}
-    }
+    }, uniOverrides || {})
   }
 
   vm.runInNewContext(script, sandbox, { filename: pagePath })
@@ -92,4 +92,44 @@ test('settlement page displays payable amount as base salary plus gross commissi
 
   assert.equal(item.displayPayableAmount, 3560)
   assert.equal(item.payableAmount, 3360)
+})
+
+test('settlement page routes completed-count metric to chef completed orders without bubbling to detail', () => {
+  assert.match(source, /class="metric complete-count-metric"[\s\S]*@click\.stop="goCompletedOrders\(item\)"/)
+  assert.match(source, /goCompletedOrders\(item\)/)
+
+  const navigatedUrls = []
+  const component = loadComponentOptions({
+    navigateTo({ url }) {
+      navigatedUrls.push(url)
+    }
+  })
+  const ctx = createPageContext(component)
+
+  component.methods.goCompletedOrders.call(ctx, {
+    id: 'SETTLE-202605',
+    month: '2026-05'
+  })
+
+  assert.deepEqual(navigatedUrls, ['/pages/work/orders?tab=done'])
+})
+
+test('settlement page routes payable-amount metric and remaining card area to settlement detail', () => {
+  assert.match(source, /class="metric payable-amount-metric"[\s\S]*@click\.stop="goDetail\(item\)"/)
+  assert.match(source, /class="settlement-card"[\s\S]*@click="goDetail\(item\)"/)
+
+  const navigatedUrls = []
+  const component = loadComponentOptions({
+    navigateTo({ url }) {
+      navigatedUrls.push(url)
+    }
+  })
+  const ctx = createPageContext(component)
+
+  component.methods.goDetail.call(ctx, {
+    id: 'SETTLE-202605',
+    month: '2026-05'
+  })
+
+  assert.deepEqual(navigatedUrls, ['/pages/work/settlement-detail?id=SETTLE-202605&month=2026-05'])
 })

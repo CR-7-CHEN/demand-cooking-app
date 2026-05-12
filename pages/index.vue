@@ -91,21 +91,23 @@
           <text class="dashboard-title">工作提醒</text>
         </view>
         <view v-if="limitedAlerts.length === 0" class="empty-alert">暂无工作提醒</view>
-        <view v-else class="alert-list">
-          <view
-            v-for="item in limitedAlerts"
-            :key="item.key"
-            class="alert-item"
-            :class="[item._toneClass, { clickable: !!item.actionUrl }]"
-            @click="openAlert(item)"
-          >
-            <view class="alert-main">
-              <view class="alert-title">{{ item.title }}</view>
-              <view class="alert-content">{{ item.content }}</view>
+        <scroll-view v-else scroll-y class="alert-scroll">
+          <view class="alert-list">
+            <view
+              v-for="item in limitedAlerts"
+              :key="item.key"
+              class="alert-item"
+              :class="[item._toneClass, { clickable: !!item.actionUrl }]"
+              @click="openAlert(item)"
+            >
+              <view class="alert-main">
+                <view class="alert-title">{{ item.title }}</view>
+                <view class="alert-content">{{ item.content }}</view>
+              </view>
+              <view v-if="item.count" class="alert-count">{{ item.count }}</view>
             </view>
-            <view v-if="item.count" class="alert-count">{{ item.count }}</view>
           </view>
-        </view>
+        </scroll-view>
       </view>
 
       <view class="dashboard-card trend-card">
@@ -209,6 +211,8 @@
     { label: '午餐', value: 'lunch' },
     { label: '晚餐', value: 'dinner' }
   ]
+  const TODAY_SERVICE_ALERT_ROUTE = '/pages/work/orders?tab=service&scope=today_service'
+  const WORK_ORDERS_SCOPE_STORAGE_KEY = 'work_orders_scope'
 
   export default {
     data() {
@@ -296,12 +300,9 @@
       },
       limitedAlerts() {
         const alerts = Array.isArray(this.chefWorkbench.alerts) ? this.chefWorkbench.alerts : []
-        return [this.buildExpiredTimeAlert(), ...alerts].filter(Boolean).slice(0, 3).map(item => {
-          const tone = String(item.tone || '').toLowerCase()
-          let cls = 'warning'
-          if (tone === 'danger' || tone === 'error') cls = 'danger'
-          else if (tone === 'success') cls = 'success'
-          return { ...item, _toneClass: cls }
+        return [this.buildExpiredTimeAlert(), ...alerts].filter(Boolean).map(item => {
+          const normalizedItem = this.normalizeWorkbenchAlert(item)
+          return { ...normalizedItem, _toneClass: this.alertToneClass(normalizedItem.tone) }
         })
       },
       revenueTrend() {
@@ -620,6 +621,16 @@
           actionUrl: '/pages/work/profile-time?mode=manage&focus=expired'
         }
       },
+      normalizeWorkbenchAlert(item) {
+        if (!item) return item
+        if (item.key === 'today_service' && !item.actionUrl) {
+          return {
+            ...item,
+            actionUrl: TODAY_SERVICE_ALERT_ROUTE
+          }
+        }
+        return item
+      },
       alertToneClass(tone) {
         const value = String(tone || '').toLowerCase()
         if (value === 'danger' || value === 'error') return 'danger'
@@ -634,6 +645,9 @@
       openAlert(item) {
         const url = item && item.actionUrl
         if (!url) return
+        if (item.key === 'today_service' && typeof uni.setStorageSync === 'function') {
+          uni.setStorageSync(WORK_ORDERS_SCOPE_STORAGE_KEY, 'today_service')
+        }
         this.requireLogin(url)
       },
       goCommission() {
@@ -1002,6 +1016,10 @@
   .trend-card {
     margin-top: 22rpx;
     padding: 26rpx;
+  }
+
+  .alert-scroll {
+    max-height: 480rpx;
   }
 
   .empty-alert {

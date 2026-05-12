@@ -280,7 +280,7 @@
         if (!this.timeForm.endTime) return '请选择结束时间'
         if (!this.normalizeMealRemark(this.timeForm.remark)) return '请选择三餐'
         if (!this.isHalfHourClock(this.timeForm.startTime) || !this.isHalfHourClock(this.timeForm.endTime)) {
-          return '璇烽€夋嫨 30 鍒嗛挓绮掑害鐨勫紑濮嬪拰缁撴潫鏃堕棿'
+          return '请选择 30 分钟粒度的开始和结束时间'
         }
         const start = new Date(`${this.timeForm.date.replace(/-/g, '/')} ${this.timeForm.startTime}:00`)
         const end = new Date(`${this.timeForm.date.replace(/-/g, '/')} ${this.timeForm.endTime}:00`)

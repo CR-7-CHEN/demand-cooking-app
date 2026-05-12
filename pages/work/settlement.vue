@@ -5,13 +5,14 @@
         <text class="sub">月度结算</text>
         <view class="title">{{ headerMonthText }}</view>
       </view>
-      <picker mode="date" fields="month" :value="pickerValue" @change="onMonthChange">
-        <view class="month-btn">{{ monthButtonText }}</view>
-      </picker>
-    </view>
-
-    <view v-if="queryMonth" class="toolbar">
-      <text class="toolbar-clear" @click="clearMonthFilter">重置月份</text>
+      <view class="month-action">
+        <picker mode="date" fields="month" :value="pickerValue" @change="onMonthChange">
+          <view class="month-btn">{{ monthButtonText }}</view>
+        </picker>
+        <view v-if="queryMonth" class="month-clear" @tap.stop="clearMonthFilter">
+          <uni-icons type="clear" size="16" color="rgba(255,255,255,0.7)"></uni-icons>
+        </view>
+      </view>
     </view>
 
     <scroll-view
@@ -45,11 +46,11 @@
           </view>
 
           <view class="metrics">
-            <view class="metric">
+            <view class="metric complete-count-metric" @click.stop="goCompletedOrders(item)">
               <text class="metric-label">完成单数</text>
               <text class="metric-value">{{ item.completeCount }}</text>
             </view>
-            <view class="metric">
+            <view class="metric payable-amount-metric" @click.stop="goDetail(item)">
               <text class="metric-label">应发金额</text>
               <text class="metric-value money">{{ formatMoney(item.displayPayableAmount) }}</text>
             </view>
@@ -401,6 +402,11 @@
         const safeNumber = Number.isNaN(number) ? 0 : number
         return `¥${safeNumber.toFixed(2)}`
       },
+      goCompletedOrders() {
+        uni.navigateTo({
+          url: '/pages/work/orders?tab=done'
+        })
+      },
       goDetail(item) {
         if (!item || !item.id) {
           uni.showToast({
@@ -452,8 +458,14 @@
     font-weight: 700;
   }
 
-  .month-btn {
+  .month-action {
+    display: flex;
+    align-items: center;
+    gap: 12rpx;
     flex-shrink: 0;
+  }
+
+  .month-btn {
     padding: 12rpx 18rpx;
     border-radius: 999rpx;
     background: rgba(255, 255, 255, 0.14);
@@ -461,18 +473,12 @@
     font-size: 24rpx;
   }
 
-  .toolbar {
+  .month-clear {
     display: flex;
     align-items: center;
-    justify-content: flex-end;
-    gap: 16rpx;
-    padding: 18rpx 24rpx 12rpx;
-  }
-
-  .toolbar-clear {
-    flex-shrink: 0;
-    color: #c1732d;
-    font-size: 24rpx;
+    justify-content: center;
+    width: 40rpx;
+    height: 40rpx;
   }
 
   .list-scroll {

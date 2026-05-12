@@ -99,42 +99,6 @@
       </view>
 
       <view class="section-card">
-        <view class="section-head">
-          <view>
-            <view class="section-title">订单明细</view>
-            <view class="section-subtitle">优先使用结算详情里的明细，没有时再按结算单 ID 或月份补拉订单。</view>
-          </view>
-          <text class="count-pill">{{ settlementOrders.length }} 单</text>
-        </view>
-
-        <view v-if="settlementOrders.length" class="detail-list">
-          <view v-for="order in settlementOrders" :key="order.id" class="detail-row">
-            <view class="detail-top">
-              <text class="order-no">{{ order.no }}</text>
-              <text :class="['status', order.tone]">{{ order.statusText }}</text>
-            </view>
-            <view class="detail-line">
-              <text class="detail-label">时间</text>
-              <text class="detail-value">{{ order.time || '服务时间待返回' }}</text>
-            </view>
-            <view class="detail-line">
-              <text class="detail-label">菜品</text>
-              <text class="detail-value">{{ order.dishes }}</text>
-            </view>
-            <view class="detail-money">
-              <text>订单金额 {{ money(order.amount) }}</text>
-              <text>结算提成 {{ money(order.commission) }}</text>
-            </view>
-          </view>
-        </view>
-
-        <view v-else class="inner-empty">
-          <view class="empty-title">暂无订单明细</view>
-          <view class="empty-text">该月份还没有进入这张结算单的完成订单。</view>
-        </view>
-      </view>
-
-      <view class="section-card">
         <view class="section-title">扣款说明</view>
         <view class="deduct-summary">
           <view class="deduct-item">

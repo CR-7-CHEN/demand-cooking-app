@@ -74,6 +74,7 @@
     dispute: ['disputeCount', 'priceObjectionCount', 'dispute'],
     refund: ['refundedCount', 'refundCount', 'refund']
   })
+  const WORK_ORDERS_SCOPE_STORAGE_KEY = 'work_orders_scope'
 
   function readCountValue(source, keys) {
     if (!source || !Array.isArray(keys)) return null
@@ -106,6 +107,7 @@
     data() {
       return {
         activeTab: 'all',
+        listScope: '',
         orders: [],
         orderStats: null,
         tabs: [{
@@ -135,7 +137,29 @@
     computed: {
       filteredOrders() {
         if (this.activeTab === 'all') return this.orders
-        return this.orders.filter(order => this.tabOf(order) === this.activeTab)
+        const tabOrders = this.orders.filter(order => this.tabOf(order) === this.activeTab)
+        if (this.listScope === 'today_service' && this.activeTab === 'service') {
+          return tabOrders.filter(order => this.isTodayServiceOrder(order))
+        }
+        return tabOrders
+      }
+    },
+    onLoad(option) {
+      if (option && option.tab && this.tabs.some(tab => tab.value === option.tab)) {
+        this.activeTab = option.tab
+      }
+      const cachedScope = typeof uni.getStorageSync === 'function'
+        ? uni.getStorageSync(WORK_ORDERS_SCOPE_STORAGE_KEY)
+        : ''
+      if (option && option.scope) {
+        this.listScope = option.scope
+      } else if (this.activeTab === 'service' && cachedScope) {
+        this.listScope = cachedScope
+      } else {
+        this.listScope = ''
+      }
+      if (cachedScope && typeof uni.removeStorageSync === 'function') {
+        uni.removeStorageSync(WORK_ORDERS_SCOPE_STORAGE_KEY)
       }
     },
     onShow() {
@@ -177,6 +201,26 @@
         const status = this.orderStatusOf(order)
         if (orderStatus.isRefundOrderStatus(status)) return 'refund'
         return chefOrderStatusGroup(status) || 'all'
+      },
+      isTodayServiceOrder(order) {
+        return this.isSameDay(this.getTime(order), new Date())
+      },
+      isSameDay(value, targetDate) {
+        const date = this.parseDate(value)
+        if (!date || Number.isNaN(date.getTime())) {
+          return false
+        }
+        const current = targetDate instanceof Date ? targetDate : new Date()
+        return date.getFullYear() === current.getFullYear() &&
+          date.getMonth() === current.getMonth() &&
+          date.getDate() === current.getDate()
+      },
+      parseDate(value) {
+        if (!value) return null
+        if (value instanceof Date) return value
+        const normalized = String(value).replace(/-/g, '/')
+        const date = new Date(normalized)
+        return Number.isNaN(date.getTime()) ? null : date
       },
       tabCountOf(tabValue) {
         if (this.orderStats && this.orderStats[tabValue] !== null && this.orderStats[tabValue] !== undefined) {

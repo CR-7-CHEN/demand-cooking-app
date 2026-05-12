@@ -203,3 +203,10 @@ test('settlement detail page displays payable amount as base salary plus gross c
 
   assert.equal(ctx.payableAmount, 3560)
 })
+
+test('settlement detail page removes the order detail display section', () => {
+  assert.doesNotMatch(detailPageSource, /<view class="section-title">订单明细<\/view>/)
+  assert.doesNotMatch(detailPageSource, /<view class="empty-title">暂无订单明细<\/view>/)
+  assert.match(detailPageSource, /<view class="section-title">结算操作<\/view>/)
+  assert.match(detailPageSource, /<view class="section-title">扣款说明<\/view>/)
+})

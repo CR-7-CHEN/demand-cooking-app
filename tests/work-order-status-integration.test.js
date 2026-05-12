@@ -259,6 +259,12 @@ test('chef order detail shows reject-reservation popup with required reason and 
   assert.match(detailSource, /reject-reservation-dialog__btn--danger"[^>]*>\u662f<\/button>/);
 });
 
+test('chef order detail does not show a second modal confirm when rejecting reservation', () => {
+  const match = detailSource.match(/submitRejectReservation\(\)\s*\{([\s\S]*?)\r?\n      \},\r?\n      submitServiceAction\(\)/);
+  assert.ok(match, 'expected submitRejectReservation method to be present');
+  assert.doesNotMatch(match[1], /\$modal\.confirm/);
+});
+
 test('chef order detail removes the reject-reservation corner title and keeps only the button entry', () => {
   assert.doesNotMatch(detailSource, /<view class="section-title">\u62d2\u7edd\u9884\u7ea6<\/view>/);
   assert.match(detailSource, /<view v-if="canQuote \|\| canHandleDispute" class="action-card">[\s\S]*?<view class="quote-actions">[\s\S]*?<button class="primary-btn quote-actions__primary" :loading="submitting" @click="submitQuote">\{\{ canHandleDispute \? '\u63d0\u4ea4\u4fee\u6539\u62a5\u4ef7' : '\u540c\u610f\u5e76\u62a5\u4ef7' \}\}<\/button>[\s\S]*?<button v-if="canReject" class="plain-danger quote-actions__reject" :loading="submitting" @click="openRejectReservationPopup">\u62d2\u7edd\u9884\u7ea6<\/button>/);
@@ -272,9 +278,10 @@ test('chef order detail returns to the order list after each successful status c
   assert.match(detailSource, /submitRejectService\(\)[\s\S]*?uni\.navigateBack\(\)/);
 });
 
-test('chef order detail centers the pending service section title only for that block', () => {
-  assert.match(detailSource, /<view class="section-title section-title--center">\u5f85\u670d\u52a1\u5904\u7406<\/view>/);
-  assert.match(detailSource, /\.section-title--center\s*\{[\s\S]*text-align:\s*center;/);
+test('chef order detail removes the pending service section title copy', () => {
+  assert.doesNotMatch(detailSource, /<view class="section-title section-title--center">\u670d\u52a1\u5904\u7406<\/view>/);
+  assert.doesNotMatch(detailSource, /<view class="section-title section-title--center">\u5f85\u670d\u52a1\u5904\u7406<\/view>/);
+  assert.match(detailSource, /<button v-if="canComplete" class="primary-btn" :loading="submitting" @click="submitServiceAction">\{\{ serviceActionText \}\}<\/button>/);
 });
 
 test('chef workbench summary uses unified grouping and strict completion checks', () => {

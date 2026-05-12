@@ -76,5 +76,5 @@ test('profile time page only accepts half-hour start and end times', () => {
     isHalfHourClock: component.methods.isHalfHourClock
   })
 
-  assert.match(message, /30/)
+  assert.equal(message, '请选择 30 分钟粒度的开始和结束时间')
 })

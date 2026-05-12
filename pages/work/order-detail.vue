@@ -60,7 +60,6 @@
     </view>
 
     <view v-if="canComplete || canChefCancel" class="action-card">
-      <view class="section-title section-title--center">待服务处理</view>
       <button v-if="canComplete" class="primary-btn" :loading="submitting" @click="submitServiceAction">{{ serviceActionText }}</button>
       <button v-if="canChefCancel" class="danger-btn cancel-block__button" :loading="submitting" @click="openRejectServicePopup">拒绝服务</button>
     </view>
@@ -272,20 +271,18 @@
           this.$modal.showToast('请填写拒绝原因')
           return
         }
-        this.$modal.confirm('确认拒绝该预约吗？拒绝后会释放时间锁定。').then(() => {
-          this.submitting = true
-          rejectChefOrder(this.orderPayload({
-            reason: this.rejectReservationReasonInput,
-            rejectReason: this.rejectReservationReasonInput
-          })).then(() => {
-            this.$modal.msgSuccess('已拒绝预约')
-            if (this.$refs.rejectReservationPopup) {
-              this.$refs.rejectReservationPopup.close()
-            }
-            uni.navigateBack()
-          }).finally(() => {
-            this.submitting = false
-          })
+        this.submitting = true
+        rejectChefOrder(this.orderPayload({
+          reason: this.rejectReservationReasonInput,
+          rejectReason: this.rejectReservationReasonInput
+        })).then(() => {
+          this.$modal.msgSuccess('已拒绝预约')
+          if (this.$refs.rejectReservationPopup) {
+            this.$refs.rejectReservationPopup.close()
+          }
+          uni.navigateBack()
+        }).finally(() => {
+          this.submitting = false
         })
       },
       submitServiceAction() {

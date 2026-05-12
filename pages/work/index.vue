@@ -59,7 +59,7 @@
 
     <view v-if="isChefWorkbenchAvailable" class="summary-grid">
       <view class="summary-card">
-        <text class="summary-number">{{ summary.waitResponse }}</text>
+        <text class="summary-number">{{ waitResponseCount }}</text>
         <text class="summary-label">待接单报价</text>
       </view>
       <view class="summary-card">
@@ -87,7 +87,10 @@
           <text class="arrow">›</text>
         </view>
         <view class="quick-item" @click="goOrders">
-          <view class="quick-icon orange">单</view>
+          <view class="quick-icon orange">
+            单
+            <text v-if="waitResponseCount > 0" class="quick-badge">{{ waitResponseReminderBadgeText }}</text>
+          </view>
           <view class="quick-body">
             <text class="quick-title">接单报价</text>
             <text class="quick-desc">响应预约、拒绝、报价、处理异议和服务完成</text>
@@ -136,6 +139,7 @@
     getChefMy,
     resignChef,
     getChefOrderList,
+    getChefWorkbench,
     getWorkbenchAnnouncements
   } from '@/api/cooking/chef'
   const chefStatus = require('@/utils/chef-status')
@@ -153,12 +157,38 @@
     return CHEF_ORDER_GROUP_MAP[orderStatus.normalizeOrderStatus(status)] || ''
   }
 
+  const WAIT_RESPONSE_COUNT_FIELDS = ['waitingResponseCount', 'responseCount', 'response']
+
+  function readCountValue(source, keys) {
+    if (!source || !Array.isArray(keys)) return null
+    for (let i = 0; i < keys.length; i += 1) {
+      const key = keys[i]
+      if (!Object.prototype.hasOwnProperty.call(source, key)) continue
+      const count = Number(source[key])
+      if (Number.isFinite(count) && count >= 0) {
+        return count
+      }
+    }
+    return null
+  }
+
+  function toOrderStats(workbench) {
+    const stats = workbench && typeof workbench === 'object'
+      ? (workbench.orderStats || workbench)
+      : null
+    if (!stats) return null
+    return {
+      response: readCountValue(stats, WAIT_RESPONSE_COUNT_FIELDS)
+    }
+  }
+
   export default {
     data() {
       return {
         loading: false,
         chef: {},
         orders: [],
+        orderStats: null,
         announcements: [],
         serviceOrderReminderCount: 0,
         resignReasonInput: '',
@@ -207,6 +237,17 @@
       },
       serviceOrderReminderBadgeText() {
         return this.serviceOrderReminderCount > 99 ? '99+' : String(this.serviceOrderReminderCount)
+      },
+      waitResponseCount() {
+        if (this.orderStats && this.orderStats.response !== null && this.orderStats.response !== undefined) {
+          return this.orderStats.response
+        }
+        return this.summary.waitResponse
+      },
+      waitResponseReminderBadgeText() {
+        const count = Number(this.waitResponseCount || 0)
+        if (!Number.isFinite(count) || count < 0) return '0'
+        return count > 99 ? '99+' : String(count)
       },
       serviceCenterActions() {
         return [
@@ -295,9 +336,10 @@
         return this.loadChef().then(() => {
           this.syncPageLabels()
           if (this.isChefWorkbenchAvailable) {
-            return Promise.all([this.loadOrders(), this.loadAnnouncements()])
+            return Promise.all([this.loadOrders(), this.loadWorkbench(), this.loadAnnouncements()])
           }
           this.orders = []
+          this.orderStats = null
           this.announcements = []
           return this.loadServiceCenterReminder()
         }).finally(() => {
@@ -328,6 +370,13 @@
           this.orders = this.toList(res)
         }).catch(() => {
           this.orders = []
+        })
+      },
+      loadWorkbench() {
+        return getChefWorkbench().then(res => {
+          this.orderStats = toOrderStats(this.unwrap(res))
+        }).catch(() => {
+          this.orderStats = null
         })
       },
       loadServiceCenterReminder() {
@@ -460,7 +509,7 @@
         }
       },
       goOrders() {
-        this.$tab.navigateTo('/pages/work/orders')
+        this.$tab.navigateTo('/pages/work/orders?tab=response')
       },
       goSettlement() {
         this.$tab.navigateTo('/pages/work/settlement')
