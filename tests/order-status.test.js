@@ -29,6 +29,34 @@ test('normalizes numeric and backend order statuses to the same canonical value'
   assert.equal(normalizeOrderStatus(5), 5);
 });
 
+test('normalizes backend closed and refund numeric statuses to stable constants', () => {
+  const backendClosedAndRefundStatuses = [
+    ['REJECTED_CLOSED', 6, '已拒绝'],
+    ['RESPONSE_TIMEOUT_CLOSED', 7, '响应超时关闭'],
+    ['OBJECTION_TIMEOUT_CLOSED', 8, '异议超时关闭'],
+    ['PAY_TIMEOUT_CLOSED', 9, '支付超时关闭'],
+    ['CANCELED', 10, '已取消'],
+    ['REFUNDING', 11, '退款中'],
+    ['REFUNDED', 12, '已退款'],
+    ['REFUND_FAILED', 13, '退款失败']
+  ];
+
+  for (const [key, value, text] of backendClosedAndRefundStatuses) {
+    assert.equal(ORDER_STATUS[key], value);
+    assert.equal(normalizeOrderStatus(value), value);
+    assert.equal(normalizeOrderStatus(String(value)), value);
+    assert.equal(normalizeOrderStatus(key), value);
+    assert.equal(orderStatusGroup(value), 'closed');
+    assert.equal(tabOfUserStatus(value), 'closed');
+    assert.equal(displayOrderStatusText(value), text);
+  }
+
+  assert.deepEqual(statusesOfUserTab('closed'), backendClosedAndRefundStatuses.map(([, value]) => value));
+  assert.equal(isRefundOrderStatus(11), true);
+  assert.equal(isRefundOrderStatus('12'), true);
+  assert.equal(isRefundOrderStatus(13), true);
+});
+
 test('groups numeric order statuses by user order lifecycle', () => {
   assert.equal(orderStatusGroup(0), 'reserved');
   assert.equal(orderStatusGroup(1), 'payment');

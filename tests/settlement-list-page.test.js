@@ -77,6 +77,29 @@ test('settlement page normalizes natural-month list payload fields from backend 
   assert.match(source, /formatMonth\(value\)/)
 })
 
+test('settlement page normalizes backend numeric settlement statuses to numeric canonical keys', () => {
+  const component = loadComponentOptions()
+  const ctx = createPageContext(component)
+
+  assert.equal(component.methods.normalizeStatus.call(ctx, 0), '0')
+  assert.equal(component.methods.normalizeStatus.call(ctx, 1), '1')
+  assert.equal(component.methods.normalizeStatus.call(ctx, 2), '2')
+  assert.equal(component.methods.normalizeStatus.call(ctx, 3), '3')
+  assert.equal(component.methods.normalizeStatus.call(ctx, 'generated'), '0')
+  assert.equal(component.methods.normalizeStatus.call(ctx, 'REVIEWING'), '1')
+  assert.equal(component.methods.normalizeStatus.call(ctx, 'CONFIRMED'), '2')
+  assert.equal(component.methods.normalizeStatus.call(ctx, 'PAID'), '3')
+
+  const records = [0, 1, 2, 3].map((status, index) => component.methods.normalizeItem.call(ctx, {
+    id: 'SET-' + status,
+    settlementMonth: '2026-05',
+    statusCode: status
+  }, 1, index))
+
+  assert.deepEqual(records.map(item => item.statusText), ['待确认', '复核中', '待发放', '已发放'])
+  assert.deepEqual(records.map(item => item.statusTone), ['warning', 'info', 'warning', 'success'])
+})
+
 test('settlement page displays payable amount as base salary plus gross commission when available', () => {
   const component = loadComponentOptions()
   const ctx = createPageContext(component)

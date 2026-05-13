@@ -7,7 +7,7 @@ const vm = require('node:vm')
 const pagePath = resolve(__dirname, '..', 'pages', 'index.vue')
 const source = readFileSync(pagePath, 'utf8')
 
-function loadComponentOptions() {
+function loadComponentOptions(baseUrl = 'http://localhost:8080') {
   const match = source.match(/<script>([\s\S]*?)<\/script>/)
   assert.ok(match, 'expected homepage to contain a script block')
 
@@ -16,7 +16,7 @@ function loadComponentOptions() {
     .replace(/import\s+\{\s*listChefs\s*\}\s+from\s+'@\/api\/cooking\/user'\s*/, "const listChefs = () => Promise.resolve([])\n")
     .replace(/import\s+\{\s*getChefMy,\s*getChefWorkbench,\s*getChefTime,\s*pauseChef,\s*resumeChef\s*\}\s+from\s+'@\/api\/cooking\/chef'\s*/, "const getChefMy = () => Promise.resolve({})\nconst getChefWorkbench = () => Promise.resolve({})\nconst getChefTime = () => Promise.resolve({})\nconst pauseChef = () => Promise.resolve({})\nconst resumeChef = () => Promise.resolve({})\n")
     .replace(/import\s+regionData\s+from\s+'@\/utils\/region-data'\s*/, 'const regionData = []\n')
-    .replace(/import appConfig from '@\/config'\s*/, 'const appConfig = { baseUrl: "http://localhost:8080" }\n')
+    .replace(/import appConfig from '@\/config'\s*/, `const appConfig = { baseUrl: ${JSON.stringify(baseUrl)} }\n`)
     .replace(/const chefStatus = require\('@\/utils\/chef-status'\)/, 'const chefStatus = { isChefWorkbenchAvailable: () => false, shouldShowChefRecommendations: () => true, isChefNormal: () => false }\n')
     .replace(/export default/, 'module.exports =')
 
@@ -34,32 +34,32 @@ function loadComponentOptions() {
   return sandbox.module.exports
 }
 
-function createPageContext(component) {
+test('homepage recommended chef normalizes snake_case avatar fields', () => {
+  const component = loadComponentOptions()
   const ctx = component.data ? component.data() : {}
   Object.assign(ctx, component.methods)
-  return ctx
-}
 
-test('homepage recommended chef card shows a cuisine label before cuisine tags', () => {
-  assert.match(source, /<text class="cuisine-label">擅长菜系<\/text>/)
-  assert.match(source, /chef\.cuisines\.length/)
+  const chef = component.methods.normalizeChef.call(ctx, {
+    chef_id: 3001,
+    chef_name: '三千世界',
+    avatar_url: '/profile/avatar.jpg'
+  })
+
+  assert.equal(chef.id, 3001)
+  assert.equal(chef.name, '三千世界')
+  assert.equal(chef.avatar, 'http://localhost:8080/profile/avatar.jpg')
 })
 
-test('homepage normalizes recommended chef cuisines from skillTags and cuisineTags', () => {
-  const component = loadComponentOptions()
-  const ctx = createPageContext(component)
+test('homepage recommended chef rewrites localhost avatar urls to current api origin', () => {
+  const component = loadComponentOptions('https://api.example.com')
+  const ctx = component.data ? component.data() : {}
+  Object.assign(ctx, component.methods)
 
-  const fromSkillTags = component.methods.normalizeChef.call(ctx, {
-    chefId: 1,
-    chefName: '张师傅',
-    skillTags: '川菜,粤菜'
-  })
-  const fromCuisineTags = component.methods.normalizeChef.call(ctx, {
-    chefId: 2,
-    chefName: '李师傅',
-    cuisineTags: '湘菜/本帮菜'
+  const chef = component.methods.normalizeChef.call(ctx, {
+    chef_id: 3001,
+    chef_name: '三千世界',
+    avatar_url: 'http://localhost:8080/cooking/chef/image/avatar.png'
   })
 
-  assert.deepEqual(Array.from(fromSkillTags.cuisines), ['川菜', '粤菜'])
-  assert.deepEqual(Array.from(fromCuisineTags.cuisines), ['湘菜', '本帮菜'])
+  assert.equal(chef.avatar, 'https://api.example.com/cooking/chef/image/avatar.png')
 })

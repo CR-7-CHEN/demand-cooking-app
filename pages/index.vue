@@ -169,6 +169,7 @@
   import { listChefs } from '@/api/cooking/user'
   import { getChefMy, getChefWorkbench, getChefTime, pauseChef, resumeChef } from '@/api/cooking/chef'
   import regionData from '@/utils/region-data'
+  import appConfig from '@/config'
   const chefStatus = require('@/utils/chef-status')
 
   const defaultAvatar = '/static/images/profile.jpg'
@@ -513,6 +514,26 @@
         if (score !== undefined && score !== null && score !== '') return score
         return '5.0'
       },
+      firstValue(item, keys) {
+        if (!item || typeof item !== 'object') return ''
+        for (let i = 0; i < keys.length; i += 1) {
+          const value = item[keys[i]]
+          if (value !== undefined && value !== null && value !== '') return value
+        }
+        return ''
+      },
+      normalizeImageUrl(value) {
+        const text = String(value || '').trim()
+        if (!text) return ''
+        const baseUrl = String((appConfig && appConfig.baseUrl) || '').replace(/\/$/, '')
+        if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?\//i.test(text) && baseUrl) {
+          return text.replace(/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/i, baseUrl)
+        }
+        if (/^(https?:)?\/\//.test(text) || /^(data|blob|wxfile):/.test(text)) return text
+        if (text.indexOf('/static/') === 0) return text
+        if (!baseUrl) return text
+        return text.indexOf('/') === 0 ? `${baseUrl}${text}` : `${baseUrl}/${text}`
+      },
       formatChefRating(value) {
         const rating = Number(value)
         if (Number.isFinite(rating)) {
@@ -521,17 +542,17 @@
         return value
       },
       normalizeChef(item) {
-        const cuisines = this.toArray(item.cuisines || item.cuisine || item.specialties || item.goodAt || item.skillTags || item.cuisineTags)
-        const areas = this.toArray(item.serviceAreas || item.serviceArea || item.serviceAreaNames || item.area)
+        const cuisines = this.toArray(this.firstValue(item, ['cuisines', 'cuisine', 'specialties', 'goodAt', 'good_at', 'skillTags', 'skill_tags', 'cuisineTags', 'cuisine_tags']))
+        const areas = this.toArray(this.firstValue(item, ['serviceAreas', 'service_areas', 'serviceArea', 'service_area', 'serviceAreaNames', 'service_area_names', 'area']))
         const rawGender = item.gender === undefined || item.gender === null ? item.sex : item.gender
         const rawAge = item.age === undefined || item.age === null ? (item.ageText === undefined || item.ageText === null ? item.ageValue : item.ageText) : item.age
         return {
           raw: item,
-          id: item.id || item.chefId || item.userChefId,
-          name: item.name || item.chefName || item.realName || '服务厨师',
-          avatar: item.avatar || item.avatarUrl || item.photo || defaultAvatar,
+          id: this.firstValue(item, ['id', 'chefId', 'chef_id', 'userChefId', 'user_chef_id']),
+          name: this.firstValue(item, ['name', 'chefName', 'chef_name', 'realName', 'real_name']) || '服务厨师',
+          avatar: this.normalizeImageUrl(this.firstValue(item, ['avatar', 'avatarUrl', 'avatar_url', 'photo'])) || defaultAvatar,
           rating: this.formatChefRating(this.pickChefRating(item)),
-          completedCount: item.completedCount || item.completeCount || item.orderCount || item.finishedOrderCount || item.completedOrders || 0,
+          completedCount: this.firstValue(item, ['completedCount', 'completed_count', 'completeCount', 'complete_count', 'orderCount', 'order_count', 'finishedOrderCount', 'finished_order_count', 'completedOrders', 'completed_orders']) || 0,
           genderText: this.formatChefGender(rawGender),
           ageText: this.formatChefAge(rawAge),
           cuisines,

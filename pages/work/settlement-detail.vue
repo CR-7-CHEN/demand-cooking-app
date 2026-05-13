@@ -128,10 +128,20 @@
 
   const SETTLED_STATUSES = ['FINISHED', 'COMPLETED', 'DONE']
   const STATUS_TEXT_MAP = {
-    GENERATED: '待确认',
-    REVIEWING: '复核中',
-    CONFIRMED: '待发放',
-    PAID: '已发放'
+    0: '待确认',
+    1: '复核中',
+    2: '待发放',
+    3: '已发放'
+  }
+  const LEGACY_STATUS_KEY_MAP = {
+    0: '0',
+    GENERATED: '0',
+    1: '1',
+    REVIEWING: '1',
+    2: '2',
+    CONFIRMED: '2',
+    3: '3',
+    PAID: '3'
   }
   const REVIEW_REASON_OPTIONS = [
     { label: '提成金额有疑问', value: 'AMOUNT_DIFF' },
@@ -180,20 +190,20 @@
         })
       },
       settlementStatusKey() {
-        return this.normalizeStatus(this.value('settlementStatus', 'status', 'statusCode', 'settleStatus')) || 'GENERATED'
+        return this.normalizeStatus(this.value('settlementStatus', 'status', 'statusCode', 'settleStatus')) || '0'
       },
       settlementStatusText() {
         const direct = this.value('settlementStatusName', 'statusName', 'statusText')
         return direct || STATUS_TEXT_MAP[this.settlementStatusKey] || '待确认'
       },
       canConfirmSettlement() {
-        return this.settlementStatusKey === 'GENERATED'
+        return this.settlementStatusKey === '0'
       },
       canRequestReview() {
-        return this.settlementStatusKey === 'GENERATED'
+        return this.settlementStatusKey === '0'
       },
       isReviewingSettlement() {
-        return this.settlementStatusKey === 'REVIEWING'
+        return this.settlementStatusKey === '1'
       },
       reviewReasonLabel() {
         const reason = this.value('reviewReasonType', 'reviewReason')
@@ -508,7 +518,10 @@
         }
       },
       normalizeStatus(status) {
-        return String(status || '').trim().toUpperCase()
+        if (status === undefined || status === null || status === '') return ''
+        const statusText = String(status).trim()
+        const statusKey = statusText.toUpperCase()
+        return LEGACY_STATUS_KEY_MAP[statusKey] || statusKey
       },
       getOrderTime(order) {
         return order.serviceStartTime || order.appointmentStartTime || order.appointmentTime || order.bookingTime || order.startTime || order.reserveTime || ''

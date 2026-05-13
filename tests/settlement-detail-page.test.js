@@ -204,6 +204,46 @@ test('settlement detail page displays payable amount as base salary plus gross c
   assert.equal(ctx.payableAmount, 3560)
 })
 
+test('settlement detail page maps numeric settlement statuses to action permissions', () => {
+  const component = loadComponentOptions()
+
+  const statusCases = [
+    { statusCode: 0, key: '0', canConfirm: true, canReview: true, reviewing: false },
+    { statusCode: 1, key: '1', canConfirm: false, canReview: false, reviewing: true },
+    { statusCode: 2, key: '2', canConfirm: false, canReview: false, reviewing: false },
+    { statusCode: 3, key: '3', canConfirm: false, canReview: false, reviewing: false }
+  ]
+
+  statusCases.forEach(expected => {
+    const ctx = createPageContext(component, {
+      settlement: { statusCode: expected.statusCode }
+    })
+
+    assert.equal(component.methods.normalizeStatus.call(ctx, expected.statusCode), expected.key)
+    assert.equal(ctx.settlementStatusKey, expected.key)
+    assert.equal(ctx.canConfirmSettlement, expected.canConfirm)
+    assert.equal(ctx.canRequestReview, expected.canReview)
+    assert.equal(ctx.isReviewingSettlement, expected.reviewing)
+  })
+})
+
+test('settlement detail page accepts legacy english settlement statuses but canonicalizes them to numeric keys', () => {
+  const component = loadComponentOptions()
+
+  assert.equal(component.methods.normalizeStatus.call(createPageContext(component), 'GENERATED'), '0')
+  assert.equal(component.methods.normalizeStatus.call(createPageContext(component), 'reviewing'), '1')
+  assert.equal(component.methods.normalizeStatus.call(createPageContext(component), 'CONFIRMED'), '2')
+  assert.equal(component.methods.normalizeStatus.call(createPageContext(component), 'PAID'), '3')
+
+  const ctx = createPageContext(component, {
+    settlement: { settlementStatus: 'generated' }
+  })
+
+  assert.equal(ctx.settlementStatusKey, '0')
+  assert.equal(ctx.canConfirmSettlement, true)
+  assert.equal(ctx.canRequestReview, true)
+})
+
 test('settlement detail page removes the order detail display section', () => {
   assert.doesNotMatch(detailPageSource, /<view class="section-title">订单明细<\/view>/)
   assert.doesNotMatch(detailPageSource, /<view class="empty-title">暂无订单明细<\/view>/)

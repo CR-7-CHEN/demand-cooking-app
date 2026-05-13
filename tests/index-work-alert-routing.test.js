@@ -16,6 +16,7 @@ function loadComponentOptions(uniOverrides = {}) {
     .replace(/import\s+\{\s*listChefs\s*\}\s+from\s+'@\/api\/cooking\/user'\s*/, "const listChefs = () => Promise.resolve([])\n")
     .replace(/import\s+\{\s*getChefMy,\s*getChefWorkbench,\s*getChefTime,\s*pauseChef,\s*resumeChef\s*\}\s+from\s+'@\/api\/cooking\/chef'\s*/, "const getChefMy = () => Promise.resolve({ data: {} })\nconst getChefWorkbench = () => Promise.resolve({ data: {} })\nconst getChefTime = () => Promise.resolve({ data: [] })\nconst pauseChef = () => Promise.resolve({})\nconst resumeChef = () => Promise.resolve({})\n")
     .replace(/import\s+regionData\s+from\s+'@\/utils\/region-data'\s*/, 'const regionData = []\n')
+    .replace(/import appConfig from '@\/config'\s*/, 'const appConfig = { baseUrl: "http://localhost:8080" }\n')
     .replace(/const chefStatus = require\('@\/utils\/chef-status'\)/, `const chefStatus = require(${JSON.stringify(path.join(__dirname, '..', 'utils', 'chef-status.js'))})`)
     .replace(/export default/, 'module.exports =')
 

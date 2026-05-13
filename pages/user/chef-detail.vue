@@ -149,6 +149,7 @@
 <script>
   import { getToken } from '@/utils/auth'
   import { getChef, listAddresses, listDishes, submitOrder } from '@/api/cooking/user'
+  import appConfig from '@/config'
 
   const defaultAvatar = '/static/images/profile.jpg'
 
@@ -260,18 +261,18 @@
         return '5.0'
       },
       normalizeChef(item) {
-        const cuisines = this.toArray(item.cuisines || item.cuisine || item.specialties || item.goodAt)
-        const areas = this.toArray(item.serviceAreas || item.serviceArea || item.serviceAreaNames || item.area)
+        const cuisines = this.toArray(this.firstValue(item, ['cuisines', 'cuisine', 'specialties', 'goodAt', 'good_at', 'skillTags', 'skill_tags', 'cuisineTags', 'cuisine_tags']))
+        const areas = this.toArray(this.firstValue(item, ['serviceAreas', 'service_areas', 'serviceArea', 'service_area', 'serviceAreaNames', 'service_area_names', 'area']))
         const availableTimes = this.normalizeAvailableTimes(item)
         return {
-          id: item.id || item.chefId || this.chefId,
-          name: item.name || item.chefName || item.realName || '服务厨师',
-          avatar: item.avatar || item.avatarUrl || item.photo || defaultAvatar,
+          id: this.firstValue(item, ['id', 'chefId', 'chef_id', 'userChefId', 'user_chef_id']) || this.chefId,
+          name: this.firstValue(item, ['name', 'chefName', 'chef_name', 'realName', 'real_name']) || '服务厨师',
+          avatar: this.normalizeImageUrl(this.firstValue(item, ['avatar', 'avatarUrl', 'avatar_url', 'photo'])) || defaultAvatar,
           rating: this.pickChefRating(item),
-          completedCount: item.completedCount || item.completeCount || item.orderCount || item.finishedOrderCount || 0,
+          completedCount: this.firstValue(item, ['completedCount', 'completed_count', 'completeCount', 'complete_count', 'orderCount', 'order_count', 'finishedOrderCount', 'finished_order_count', 'completedOrders', 'completed_orders']) || 0,
           cuisines,
           serviceAreaText: areas.length ? areas.join('、') : '',
-          recommended: item.recommended || item.recommendFlag || item.isRecommended,
+          recommended: this.firstValue(item, ['recommended', 'recommendFlag', 'recommend_flag', 'isRecommended', 'is_recommended']),
           description: item.intro || item.description || item.introduction || item.profile || item.remark || '',
           workImages: this.parseWorkImages(item),
           healthCertExpireText: this.formatHealthCertExpire(item),
@@ -282,7 +283,7 @@
         }
       },
       normalizeAvailableTimes(item) {
-        const keys = ['availableTimes', 'availableTimeList', 'serviceTimes', 'serviceTimeList', 'workTimes']
+        const keys = ['availableTimes', 'available_times', 'availableTimeList', 'available_time_list', 'serviceTimes', 'service_times', 'serviceTimeList', 'service_time_list', 'workTimes', 'work_times']
         for (let i = 0; i < keys.length; i += 1) {
           const value = item && item[keys[i]]
           if (Array.isArray(value)) {
@@ -298,24 +299,24 @@
           return { startTime: '', endTime: '', status: '0' }
         }
         return {
-          startTime: this.firstValue(item, ['startTime', 'serviceStartTime', 'availableStartTime', 'workStartTime']),
-          endTime: this.firstValue(item, ['endTime', 'serviceEndTime', 'availableEndTime', 'workEndTime']),
+          startTime: this.firstValue(item, ['startTime', 'serviceStartTime', 'availableStartTime', 'workStartTime', 'start_time', 'service_start_time', 'available_start_time', 'work_start_time']),
+          endTime: this.firstValue(item, ['endTime', 'serviceEndTime', 'availableEndTime', 'workEndTime', 'end_time', 'service_end_time', 'available_end_time', 'work_end_time']),
           status: String(this.firstValue(item, ['status']) || '0')
         }
       },
       parseWorkImages(item) {
-        const raw = item.workImageUrls || item.workImages || item.portfolioImages || ''
-        if (Array.isArray(raw)) return raw.filter(Boolean)
+        const raw = this.firstValue(item, ['workImageUrls', 'work_image_urls', 'workImages', 'work_images', 'portfolioImages', 'portfolio_images']) || ''
+        if (Array.isArray(raw)) return raw.map(url => this.normalizeImageUrl(url)).filter(Boolean)
         const text = String(raw).trim()
         if (!text) return []
         try {
           const parsed = JSON.parse(text)
-          if (Array.isArray(parsed)) return parsed.filter(Boolean)
+          if (Array.isArray(parsed)) return parsed.map(url => this.normalizeImageUrl(url)).filter(Boolean)
         } catch (e) {}
-        return text.split(/[,;，；\s]+/).filter(Boolean)
+        return text.split(/[,;，；\s]+/).map(url => this.normalizeImageUrl(url)).filter(Boolean)
       },
       formatHealthCertExpire(item) {
-        const raw = item.healthCertExpireDate || item.healthCertExpire || ''
+        const raw = this.firstValue(item, ['healthCertExpireDate', 'health_cert_expire_date', 'healthCertExpire', 'health_cert_expire'])
         if (!raw) return ''
         const text = String(raw).trim()
         if (!text) return ''
@@ -341,21 +342,32 @@
       formatAvailableTime(item) {
         const directText = this.firstValue(item, [
           'availableTimeText',
+          'available_time_text',
           'serviceTimeText',
+          'service_time_text',
           'scheduleText',
+          'schedule_text',
           'availableTime',
+          'available_time',
           'availableTimes',
+          'available_times',
           'serviceTime',
+          'service_time',
           'serviceTimes',
+          'service_times',
           'workTime',
+          'work_time',
           'workingTime',
+          'working_time',
           'businessHours',
-          'openingHours'
+          'business_hours',
+          'openingHours',
+          'opening_hours'
         ])
         if (directText) return this.textValue(directText)
 
-        const start = this.firstValue(item, ['serviceStartTime', 'workStartTime', 'availableStartTime', 'startTime'])
-        const end = this.firstValue(item, ['serviceEndTime', 'workEndTime', 'availableEndTime', 'endTime'])
+        const start = this.firstValue(item, ['serviceStartTime', 'workStartTime', 'availableStartTime', 'startTime', 'service_start_time', 'work_start_time', 'available_start_time', 'start_time'])
+        const end = this.firstValue(item, ['serviceEndTime', 'workEndTime', 'availableEndTime', 'endTime', 'service_end_time', 'work_end_time', 'available_end_time', 'end_time'])
         if (start && end) return `${start}-${end}`
         return '可预约时间待确认'
       },
@@ -411,11 +423,24 @@
         return texts.length ? texts.join('；') : '价格待报价，以报价为准'
       },
       firstValue(item, keys) {
+        if (!item || typeof item !== 'object') return ''
         for (let i = 0; i < keys.length; i += 1) {
           const value = item[keys[i]]
           if (value !== undefined && value !== null && value !== '') return value
         }
         return ''
+      },
+      normalizeImageUrl(value) {
+        const text = String(value || '').trim()
+        if (!text) return ''
+        const baseUrl = String((appConfig && appConfig.baseUrl) || '').replace(/\/$/, '')
+        if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?\//i.test(text) && baseUrl) {
+          return text.replace(/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/i, baseUrl)
+        }
+        if (/^(https?:)?\/\//.test(text) || /^(data|blob|wxfile):/.test(text)) return text
+        if (text.indexOf('/static/') === 0) return text
+        if (!baseUrl) return text
+        return text.indexOf('/') === 0 ? `${baseUrl}${text}` : `${baseUrl}/${text}`
       },
       textValue(value) {
         if (Array.isArray(value)) {

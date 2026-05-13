@@ -74,10 +74,10 @@
   const PAGE_SIZE = 8
 
   const STATUS_TEXT_MAP = {
-    GENERATED: '待确认',
-    REVIEWING: '复核中',
-    CONFIRMED: '待发放',
-    PAID: '已发放',
+    0: '待确认',
+    1: '复核中',
+    2: '待发放',
+    3: '已发放',
     SETTLED: '已结算',
     FINISHED: '已结算',
     COMPLETED: '已结算',
@@ -92,11 +92,22 @@
     CANCELED: '已取消'
   }
 
+  const LEGACY_STATUS_KEY_MAP = {
+    0: '0',
+    GENERATED: '0',
+    1: '1',
+    REVIEWING: '1',
+    2: '2',
+    CONFIRMED: '2',
+    3: '3',
+    PAID: '3'
+  }
+
   const STATUS_TONE_MAP = {
-    GENERATED: 'warning',
-    REVIEWING: 'info',
-    CONFIRMED: 'warning',
-    PAID: 'success',
+    0: 'warning',
+    1: 'info',
+    2: 'warning',
+    3: 'success',
     SETTLED: 'success',
     FINISHED: 'success',
     COMPLETED: 'success',
@@ -338,7 +349,10 @@
         return null
       },
       normalizeStatus(status) {
-        return String(status || '').trim().toUpperCase()
+        if (status === undefined || status === null || status === '') return ''
+        const statusText = String(status).trim()
+        const statusKey = statusText.toUpperCase()
+        return LEGACY_STATUS_KEY_MAP[statusKey] || statusKey
       },
       statusText(item, statusKey) {
         const direct = this.firstValue(item, [
@@ -359,16 +373,16 @@
           'remark',
           'note'
         ])
-        if (statusKey === 'GENERATED') {
+        if (statusKey === '0') {
           return '请进入详情确认无异议或申请复核'
         }
-        if (statusKey === 'REVIEWING') {
+        if (statusKey === '1') {
           return String(direct || '复核处理中，请耐心等待')
         }
-        if (statusKey === 'CONFIRMED') {
+        if (statusKey === '2') {
           return '已确认无异议，待平台发放'
         }
-        if (statusKey === 'PAID') {
+        if (statusKey === '3') {
           return '已发放，请留意到账情况'
         }
         if (direct) return String(direct)
