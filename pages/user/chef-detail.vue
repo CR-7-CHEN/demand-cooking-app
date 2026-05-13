@@ -373,16 +373,34 @@
       },
       formatAvailableTimeLines(text) {
         const value = String(text || '可预约时间待确认').trim()
+        const cleanAvailableTimeLine = this && this.cleanAvailableTimeLine
+          ? item => this.cleanAvailableTimeLine(item)
+          : item => {
+            const raw = String(item || '').trim()
+            if (!/[闁娴閸閺鍘绠瀹鑱鑿棰鍙鎻璇鐐锛銆楼浠冣晠顦牓]/.test(raw)) return raw
+            const match = raw.match(/(\d{1,2}:\d{2}(?:\s*[-~至到]\s*\d{1,2}:\d{2}.*)?)/)
+            return match ? match[1].trim() : raw
+          }
         return value
           .split(/[;\n；]+/)
           .map(item => item.trim())
           .filter(Boolean)
           .map(item => {
-            if (/^\d/.test(item)) return item
-            const match = item.match(/^(.+?)\s*[:：]\s*(\d{1,2}:\d{2}.*)$/)
-            if (!match) return item
+            const cleaned = cleanAvailableTimeLine(item)
+            if (/^\d/.test(cleaned)) return cleaned
+            const match = cleaned.match(/^(.+?)\s*[:：]\s*(\d{1,2}:\d{2}.*)$/)
+            if (!match) return cleaned
             return `${match[1]} ${match[2]}`.trim()
           })
+      },
+      cleanAvailableTimeLine(text) {
+        const value = String(text || '').trim()
+        if (!this.hasMojibakeText(value)) return value
+        const match = value.match(/(\d{1,2}:\d{2}(?:\s*[-~至到]\s*\d{1,2}:\d{2}.*)?)/)
+        return match ? match[1].trim() : value
+      },
+      hasMojibakeText(text) {
+        return /[\uFFFD闁娴閸閺鍘绠瀹鑱鑿棰鍙鎻璇鐐锛銆楼浠冣晠顦牓]/.test(String(text || ''))
       },
       buildAvailableTimeLines(availableTimes, fallbackText) {
         const lines = (availableTimes || [])
@@ -458,19 +476,23 @@
         return /[¥元]/.test(text) ? text : `¥${text}`
       },
       normalizeAddress(item) {
-        const region = item.region || item.areaName || item.area || item.district || ''
-        const detail = item.detailAddress || item.address || item.detail || ''
-        const house = item.houseNumber || item.doorNo || item.houseNo || ''
+        const region = this.cleanAddressText(item.region || item.areaName || item.area || item.district || '')
+        const detail = this.cleanAddressText(item.detailAddress || item.address || item.detail || '')
+        const house = this.cleanAddressText(item.houseNumber || item.doorNo || item.houseNo || '')
         return {
           id: item.id || item.addressId,
-          contactName: item.contactName || item.name || item.receiver || '联系人',
+          contactName: this.cleanAddressText(item.contactName || item.name || item.receiver || '', '联系人'),
           phone: item.phone || item.mobile || item.contactPhone || '',
           region,
           detailAddress: detail,
           houseNumber: house,
-          fullAddress: [region, detail, house].filter(Boolean).join(' '),
+          fullAddress: [region, detail, house].filter(Boolean).join(' ') || '地址信息待完善',
           isDefault: this.normalizeDefault(item.isDefault, item.defaultFlag)
         }
+      },
+      cleanAddressText(text, fallback = '') {
+        const value = String(text || '').trim()
+        return value && !this.hasMojibakeText(value) ? value : fallback
       },
       normalizeDefault(...values) {
         return values.some(value => value === true || value === 1 || value === '1' || value === 'true' || value === 'Y')

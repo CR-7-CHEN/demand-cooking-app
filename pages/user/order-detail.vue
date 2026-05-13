@@ -66,8 +66,7 @@
     },
     computed: {
       canPay() {
-        return orderStatus.isOrderStatus(this.order.status, orderStatus.ORDER_STATUS.WAITING_PAY) ||
-          orderStatus.isOrderStatus(this.order.status, orderStatus.ORDER_STATUS.PRICE_OBJECTION)
+        return orderStatus.isOrderStatus(this.order.status, orderStatus.ORDER_STATUS.WAITING_PAY)
       },
       canObjection() {
         return orderStatus.isOrderStatus(this.order.status, orderStatus.ORDER_STATUS.WAITING_PAY) &&

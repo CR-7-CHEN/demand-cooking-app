@@ -88,11 +88,36 @@ test('toggle dish selection adds and removes dish ids', () => {
   assert.deepEqual(ctx.selectedDishIds, [])
 })
 
+test('normalize address hides mojibake fields from booking information', () => {
+  const component = loadComponentOptions()
+  const ctx = component.data.call({})
+  Object.assign(ctx, component.methods)
+
+  const address = component.methods.normalizeAddress.call(ctx, {
+    addressId: 1,
+    contactName: '����',
+    contactPhone: '13812345678',
+    areaName: '������ ��Ͻ�� ������',
+    detailAddress: '�������ڴ��100��',
+    houseNumber: '3��1��Ԫ201'
+  })
+
+  assert.equal(address.contactName, '联系人')
+  assert.equal(address.fullAddress, '地址信息待完善')
+})
+
 test('format available time lines splits colon and semicolon separated segments', () => {
+  const component = loadComponentOptions()
+  const lines = component.methods.formatAvailableTimeLines.call({}, '早餐: 08:00-09:00; 午餐: 11:00-12:00')
+
+  assert.deepEqual(Array.from(lines), ['早餐 08:00-09:00', '午餐 11:00-12:00'])
+})
+
+test('format available time lines strips mojibake labels from legacy data', () => {
   const component = loadComponentOptions()
   const lines = component.methods.formatAvailableTimeLines.call({}, '閺冣晠顦? 08:00-09:00; 閸楀牓顦? 11:00-12:00')
 
-  assert.deepEqual(Array.from(lines), ['閺冣晠顦? 08:00-09:00', '閸楀牓顦? 11:00-12:00'])
+  assert.deepEqual(Array.from(lines), ['08:00-09:00', '11:00-12:00'])
 })
 
 test('available time popup uses full availableTimes data and sorts by start time descending', () => {

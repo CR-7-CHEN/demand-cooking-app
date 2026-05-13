@@ -14,3 +14,14 @@ test('user order detail gives the cancel button a wider dedicated layout', () =>
   assert.match(source, /\.cancel-btn\s*\{[\s\S]*grid-column:\s*1\s*\/\s*-1;/)
   assert.match(source, /\.cancel-btn\s*\{[\s\S]*width:\s*100%;/)
 })
+
+test('user order detail only shows pay action for waiting pay orders', () => {
+  const start = source.indexOf('canPay()')
+  const end = source.indexOf('canObjection()', start)
+  const canPay = source.slice(start, end)
+
+  assert.notEqual(start, -1)
+  assert.notEqual(end, -1)
+  assert.match(canPay, /ORDER_STATUS\.WAITING_PAY/)
+  assert.doesNotMatch(canPay, /PRICE_OBJECTION/)
+})
