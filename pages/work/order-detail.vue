@@ -210,6 +210,21 @@
         if (!order) return ''
         return order.serviceStartedTime || order.serviceStartedAt || ''
       },
+      parseOrderTime(value) {
+        if (!value) return null
+        if (value instanceof Date) return value
+        const normalized = typeof value === 'string' ? value.replace(/-/g, '/') : value
+        const time = new Date(normalized)
+        return Number.isNaN(time.getTime()) ? null : time
+      },
+      getStartServiceConfirmContent(now = new Date()) {
+        const serviceStartTime = this.parseOrderTime(this.order && this.order.serviceStartTime)
+        const currentTime = this.parseOrderTime(now)
+        if (serviceStartTime && currentTime && currentTime.getTime() < serviceStartTime.getTime()) {
+          return '当前未到预约时间，确认提前开始服务吗?'
+        }
+        return '确认开始服务吗?'
+      },
       getAddress(order) {
         const address = order.address || order.addressSnapshot || {}
         if (typeof address === 'string') return address
@@ -294,7 +309,7 @@
       },
       submitStartService() {
         uni.showModal({
-          content: '确认开始服务吗?',
+          content: this.getStartServiceConfirmContent(),
           cancelText: '取消',
           confirmText: '确认',
           success: res => {

@@ -8,6 +8,7 @@ const root = path.join(__dirname, '..');
 const readSource = (...parts) => fs.readFileSync(path.join(root, ...parts), 'utf8');
 
 const ordersPagePath = path.join(root, 'pages', 'work', 'orders.vue');
+const detailPagePath = path.join(root, 'pages', 'work', 'order-detail.vue');
 const ordersSource = readSource('pages', 'work', 'orders.vue');
 const detailSource = readSource('pages', 'work', 'order-detail.vue');
 const workbenchSource = readSource('pages', 'work', 'index.vue');
@@ -62,6 +63,79 @@ function createOrdersContext(component, overrides = {}) {
     },
     $tab: {
       navigateTo() {}
+    },
+    ...overrides
+  };
+
+  Object.assign(ctx, component.methods);
+
+  Object.entries(component.computed || {}).forEach(([name, getter]) => {
+    Object.defineProperty(ctx, name, {
+      configurable: true,
+      enumerable: true,
+      get() {
+        return getter.call(ctx);
+      }
+    });
+  });
+
+  return ctx;
+}
+
+function loadDetailComponent(apiOverrides = {}) {
+  const match = detailSource.match(/<script>([\s\S]*?)<\/script>/);
+  assert.ok(match, 'expected order detail page to contain a script block');
+
+  const script = match[1]
+    .replace(
+      /import\s+\{[\s\S]*?\}\s+from\s+'@\/api\/cooking\/chef'\s*/,
+      [
+        'const getCookingOrder = globalThis.__testApi.getCookingOrder',
+        'const rejectChefOrder = globalThis.__testApi.rejectChefOrder',
+        'const quoteChefOrder = globalThis.__testApi.quoteChefOrder',
+        'const startServiceChefOrder = globalThis.__testApi.startServiceChefOrder',
+        'const serviceCompleteChefOrder = globalThis.__testApi.serviceCompleteChefOrder',
+        'const cancelChefOrder = globalThis.__testApi.cancelChefOrder'
+      ].join('\n') + '\n'
+    )
+    .replace(
+      /const orderStatus = require\('@\/utils\/order-status'\)/,
+      `const orderStatus = require(${JSON.stringify(path.join(root, 'utils', 'order-status.js'))})`
+    )
+    .replace(/export default/, 'module.exports =');
+
+  const sandbox = {
+    module: { exports: {} },
+    exports: {},
+    require,
+    console,
+    Promise,
+    Date,
+    setTimeout,
+    clearTimeout,
+    globalThis: {
+      __testApi: {
+        getCookingOrder: () => Promise.resolve({ data: {} }),
+        rejectChefOrder: () => Promise.resolve({}),
+        quoteChefOrder: () => Promise.resolve({}),
+        startServiceChefOrder: () => Promise.resolve({}),
+        serviceCompleteChefOrder: () => Promise.resolve({}),
+        cancelChefOrder: () => Promise.resolve({}),
+        ...apiOverrides
+      }
+    }
+  };
+
+  vm.runInNewContext(script, sandbox, { filename: detailPagePath });
+  return sandbox.module.exports;
+}
+
+function createDetailContext(component, overrides = {}) {
+  const ctx = {
+    ...(component.data ? component.data() : {}),
+    $modal: {
+      showToast() {},
+      msgSuccess() {}
     },
     ...overrides
   };
@@ -233,10 +307,29 @@ test('chef order detail switches service action by backend started fields instea
 });
 
 test('chef order detail uses dedicated confirm modal copy for start and complete actions', () => {
-  assert.match(detailSource, /uni\.showModal\(\{[\s\S]*content:\s*'\u786e\u8ba4\u5f00\u59cb\u670d\u52a1\u5417\?'/);
-  assert.match(detailSource, /uni\.showModal\(\{[\s\S]*content:\s*'\u786e\u8ba4\u5f00\u59cb\u670d\u52a1\u5417\?'[\s\S]*cancelText:\s*'\u53d6\u6d88'[\s\S]*confirmText:\s*'\u786e\u8ba4'/);
+  assert.match(detailSource, /getStartServiceConfirmContent\(\)/);
+  assert.match(detailSource, /uni\.showModal\(\{[\s\S]*content:\s*this\.getStartServiceConfirmContent\(\)/);
+  assert.match(detailSource, /uni\.showModal\(\{[\s\S]*content:\s*this\.getStartServiceConfirmContent\(\)[\s\S]*cancelText:\s*'\u53d6\u6d88'[\s\S]*confirmText:\s*'\u786e\u8ba4'/);
   assert.match(detailSource, /uni\.showModal\(\{[\s\S]*content:\s*'\u670d\u52a1\u786e\u8ba4\u5b8c\u6210\u4e86\u5417\?'/);
   assert.match(detailSource, /uni\.showModal\(\{[\s\S]*content:\s*'\u670d\u52a1\u786e\u8ba4\u5b8c\u6210\u4e86\u5417\?'[\s\S]*cancelText:\s*'\u53d6\u6d88'[\s\S]*confirmText:\s*'\u786e\u8ba4\u5b8c\u6210'/);
+});
+
+test('chef order detail asks for confirmation before an early start based on serviceStartTime', () => {
+  const component = loadDetailComponent();
+  const ctx = createDetailContext(component, {
+    order: {
+      serviceStartTime: '2026-05-14 18:00:00'
+    }
+  });
+
+  assert.equal(
+    ctx.getStartServiceConfirmContent(new Date('2026-05-14T09:00:00+08:00')),
+    '\u5f53\u524d\u672a\u5230\u9884\u7ea6\u65f6\u95f4\uff0c\u786e\u8ba4\u63d0\u524d\u5f00\u59cb\u670d\u52a1\u5417?'
+  );
+  assert.equal(
+    ctx.getStartServiceConfirmContent(new Date('2026-05-14T18:00:00+08:00')),
+    '\u786e\u8ba4\u5f00\u59cb\u670d\u52a1\u5417?'
+  );
 });
 
 test('chef order detail shows reject-service popup with required reason before cancel request', () => {
