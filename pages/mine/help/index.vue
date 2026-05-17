@@ -23,7 +23,7 @@
             icon: 'iconfont icon-help',
             title: '预约服务',
             childList: [{
-              title: '如何预约上门做饭？',
+              title: '如何预约上门家厨？',
               content: '进入首页选择服务类型、用餐时间、用餐人数和地址，提交订单后等待服务厨师接单。'
             }, {
               title: '可以提前多久预约？',

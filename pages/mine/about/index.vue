@@ -3,7 +3,7 @@
     <view class="header-section text-center">
       <image class="brand-logo" src="/static/images/cooking-chef-logo.png" mode="aspectFit">
       </image>
-      <uni-title type="h2" title="上门做饭"></uni-title>
+      <uni-title type="h2" title="上门家厨"></uni-title>
     </view>
 
     <view class="content-section">
@@ -36,7 +36,7 @@
     </view>
 
     <view class="copyright">
-      <view>专注家庭餐桌的上门做饭服务</view>
+      <view>专注家庭餐桌的上门家厨服务</view>
     </view>
   </view>
 </template>

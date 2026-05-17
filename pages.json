@@ -12,7 +12,7 @@
   }, {
     "path": "pages/index",
     "style": {
-      "navigationBarTitleText": "上门做饭",
+      "navigationBarTitleText": "上门家厨",
       "navigationStyle": "custom"
     }
   }, {
@@ -157,7 +157,7 @@
   },
   "globalStyle": {
     "navigationBarTextStyle": "black",
-    "navigationBarTitleText": "上门做饭",
+    "navigationBarTitleText": "上门家厨",
     "navigationBarBackgroundColor": "#fff7f0"
   }
 }

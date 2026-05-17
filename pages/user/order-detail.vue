@@ -101,7 +101,7 @@
       panelPlaceholder() {
         const map = {
           objection: '请说明你对报价的疑问',
-          review: '说说这次上门做饭体验',
+          review: '说说这次上门家厨体验',
           complaint: '请说明投诉原因和事实'
         }
         return map[this.panel] || ''
