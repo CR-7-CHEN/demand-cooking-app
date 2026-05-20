@@ -219,9 +219,13 @@ test('user order detail formats JSON dish snapshot into readable dish demand tex
   assert.equal(normalized.dishText, '红烧肉、番茄炒蛋、青菜；少辣；自带米饭');
 });
 
-test('order list query uses tab helper status arrays and status text normalizes status first', () => {
-  assert.match(ordersSource, /statuses:\s*orderTabs\.statusesOfTab\(this\.activeStatus\)/);
+test('order list query delegates tab status rules to backend statusGroup only', () => {
   assert.match(ordersSource, /statusGroup:\s*this\.activeStatus/);
+  assert.match(ordersSource, /statusGroup:\s*'payment'/);
+  assert.doesNotMatch(ordersSource, /statuses:\s*orderTabs\.statusesOfTab/);
+});
+
+test('order status text normalizes status first', () => {
   assert.match(ordersSource, /normalizeOrderStatus\(status\)/);
 });
 

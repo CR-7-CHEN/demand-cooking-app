@@ -94,12 +94,10 @@
       loadOrders() {
         this.loading = true
         const currentQuery = {
-          statusGroup: this.activeStatus,
-          statuses: orderTabs.statusesOfTab(this.activeStatus)
+          statusGroup: this.activeStatus
         }
         const paymentQuery = {
-          statusGroup: 'payment',
-          statuses: orderTabs.statusesOfTab('payment')
+          statusGroup: 'payment'
         }
         return Promise.all([
           listMyOrders(currentQuery),
